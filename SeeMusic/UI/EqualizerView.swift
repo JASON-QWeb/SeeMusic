@@ -10,15 +10,20 @@ struct EqualizerView: View {
     @State private var smoothedRMS: CGFloat = 0.0
     @State private var smoothedLowEnergy: CGFloat = 0.0
     @State private var smoothedBeat: CGFloat = 0.0
+    
+    // 柱子高度状态
     @State private var columnHeights: [CGFloat] = [0.08, 0.08, 0.08, 0.08, 0.08]
+    // 峰值保持时间 (用于控制熄灭延迟)
+    @State private var columnHoldTimers: [Date] = Array(repeating: Date(), count: 5)
     
     // 柱子逻辑映射 (用于随机交换)
     @State private var columnMapping: [Int] = [0, 1, 2, 3, 4]
     @State private var lastShuffleTime = Date()
+    @State private var nextShuffleInterval: TimeInterval = 2.0 // 初始随机间隔
     
     // 柱状图配置
     private let columnCount = 5
-    private let blockCount = 12 // 增加分辨率
+    private let blockCount = 12
     private let blockSpacing: CGFloat = 2
     private let columnSpacing: CGFloat = 4
     
@@ -106,15 +111,12 @@ struct EqualizerView: View {
         return block < activeIndex
     }
     
-    // 方块颜色：红黄绿渐变，叠加亮度渐变
-    // "最底下最深上面最淡" -> 底部高饱和度低亮度，顶部高亮度
+    // 方块颜色
     private func blockColor(blockIndex: Int, isActive: Bool) -> Color {
         let normalizedIndex = CGFloat(blockIndex) / CGFloat(blockCount - 1)
         
         if !isActive {
             // 未激活：底深灰 -> 顶极淡灰
-            // Bottom (0.0): Opacity 0.5
-            // Top (1.0): Opacity 0.05
             let inactiveOpacity = 0.5 - normalizedIndex * 0.45
             return Color.black.opacity(inactiveOpacity)
         }
@@ -122,22 +124,18 @@ struct EqualizerView: View {
         // 基础色相 (Hue)
         let baseColor: Color
         if blockIndex >= blockCount - 2 {
-            // Top 2: 红色 (警示/高潮)
+            // Top 2: 红色
             baseColor = Color(red: 1.0, green: 0.2, blue: 0.2)
         } else if blockIndex >= blockCount - 5 {
-            // Mid 3: 黄色 (过渡)
+            // Mid 3: 黄色
             baseColor = Color(red: 1.0, green: 0.85, blue: 0.0)
         } else {
-            // Bottom: 绿色 (正常)
+            // Bottom: 绿色
             baseColor = Color(red: 0.2, green: 1.0, blue: 0.4)
         }
         
-        // 渐变效果：
-        // 底部：深厚 (opacity 1.0)
-        // 顶部：淡化 (opacity 降低)
-        // 模拟 "最底下最深" -> "上面最淡"
-        let fadeFactor = 1.0 - normalizedIndex * 0.4 // 顶部最淡 0.6 不透明度
-        
+        // 渐变效果：底部深厚，顶部淡化
+        let fadeFactor = 1.0 - normalizedIndex * 0.4
         return baseColor.opacity(fadeFactor)
     }
     
@@ -156,12 +154,14 @@ struct EqualizerView: View {
     // 检查是否需要随机交换柱子
     private func checkShuffle() {
         let now = Date()
-        if now.timeIntervalSince(lastShuffleTime) > 10.0 {
-            // 每10秒随机洗牌
+        if now.timeIntervalSince(lastShuffleTime) > nextShuffleInterval {
+            // 随机洗牌
             withAnimation(.easeInOut(duration: 0.5)) {
                 columnMapping.shuffle()
             }
             lastShuffleTime = now
+            // 设置下一次随机间隔 (1.0 - 5.0 秒)
+            nextShuffleInterval = Double.random(in: 1.0...5.0)
         }
     }
     
@@ -181,77 +181,79 @@ struct EqualizerView: View {
             rawBeat = 0.0
         }
         
-        // 调慢闪烁频率 (降低 Attack/Release 速度)
-        // 1. 之前太快了，人眼不适
-        // 2. 更加平滑
-        let attackFast: CGFloat = 0.35   // 原 0.5
-        let attackSlow: CGFloat = 0.20   // 原 0.35
-        let releaseFast: CGFloat = 0.15  // 原 0.25
-        let releaseSlow: CGFloat = 0.08  // 原 0.15
+        // 一级平滑 (Input Smoothing)
+        // 保持较快的响应，以便捕捉瞬态，实际的视觉平滑在 columnHeights 处理
+        let attack: CGFloat = 0.4
+        let release: CGFloat = 0.2
         
-        // RMS 平滑
-        if rawRMS > smoothedRMS {
-            smoothedRMS += (rawRMS - smoothedRMS) * attackFast
-        } else {
-            smoothedRMS += (rawRMS - smoothedRMS) * releaseFast
-        }
+        if rawRMS > smoothedRMS { smoothedRMS += (rawRMS - smoothedRMS) * attack }
+        else { smoothedRMS += (rawRMS - smoothedRMS) * release }
         
-        // 低频平滑 (沉稳)
-        if rawLow > smoothedLowEnergy {
-            smoothedLowEnergy += (rawLow - smoothedLowEnergy) * attackSlow
-        } else {
-            smoothedLowEnergy += (rawLow - smoothedLowEnergy) * releaseSlow
-        }
+        if rawLow > smoothedLowEnergy { smoothedLowEnergy += (rawLow - smoothedLowEnergy) * attack }
+        else { smoothedLowEnergy += (rawLow - smoothedLowEnergy) * release }
         
-        // 节拍平滑 (瞬态)
-        smoothedBeat += (rawBeat - smoothedBeat) * 0.4 // 原 0.5
+        smoothedBeat += (rawBeat - smoothedBeat) * 0.4
         
         updateColumnHeights()
     }
     
-    // 更新各列高度 - 模拟频谱分析仪
+    // 更新各列高度
     private func updateColumnHeights() {
-        // 分解能量分量
-        // 降低整体增益，解决 "汇聚在上层" 的问题
+        // 1. 计算目标高度 (Target Heights)
         let bass = smoothedBeat * 0.7 + smoothedLowEnergy * 0.3
-        let mid = smoothedRMS * 0.8 // 降低 Mid 增益 (原 1.2)
-        let randomHigh = CGFloat.random(in: 0...0.15)
+        let mid = smoothedRMS * 0.75 // 稍微降低
+        let randomHigh = CGFloat.random(in: 0...0.12)
         let treble = smoothedRMS * 0.5 + randomHigh
         
-        // 预计算5个频段高度 (0.0 - 1.0)
-        var h: [CGFloat] = [0, 0, 0, 0, 0]
+        var targets: [CGFloat] = [0, 0, 0, 0, 0]
+        targets[0] = bass * 1.1
+        targets[1] = bass * 0.5 + mid * 0.4
+        targets[2] = mid * 0.9 + treble * 0.2 
+        targets[3] = mid * 0.5 + treble * 0.5
+        targets[4] = treble * 0.8
         
-        // Col 1: Bass (鼓点主力)
-        h[0] = bass * 1.1
+        // 2. 应用平滑逻辑 (Peak Hold + Slow Decay)
+        let now = Date()
+        // 最小点亮保持时间 (0.15秒)
+        let holdDuration: TimeInterval = 0.15
+        // 线性下降速度 (每秒下降的比例，例如 0.8 表示1秒下降80%)
+        // 越小下降越慢
+        let decaySpeed: CGFloat = 1.5 / CGFloat(config.frameRateMode.fps) 
         
-        // Col 2: Low-Mid (Bass与整体的过渡)
-        h[1] = bass * 0.5 + mid * 0.4
-        
-        // Col 3: Mid (人声主力)
-        // 混合更多的高频成分，让它动起来，不要死板地跟着 RMS
-        h[2] = mid * 0.9 + treble * 0.2 
-        
-        // Col 4: High-Mid (人声泛音)
-        h[3] = mid * 0.5 + treble * 0.5
-        
-        // Col 5: High (高频噪点/空气感)
-        h[4] = treble * 0.8
-        
-        // 应用对数映射增强低音量表现，并限制范围
         for i in 0..<columnCount {
-            // 对数映射：让小数值也能显示出高度
-            // log(1 + x * 5) / log(6)
-            var val = h[i]
-            if val > 0 {
-                val = log(1 + val * 5) / log(6)
+            var target = targets[i]
+            // 对数映射处理
+            if target > 0 { target = log(1 + target * 5) / log(6) }
+            target += CGFloat.random(in: -0.01...0.01)
+            target = max(0.08, min(1.0, target))
+            
+            var current = columnHeights[i]
+            
+            if target > current {
+                // 上升：直接响应 (Attack)
+                // 稍微平滑一点上升，不要瞬间满格
+                let rise = (target - current) * 0.4
+                current += rise
+                // 更新保持计时器
+                columnHoldTimers[i] = now
+            } else {
+                // 下降：检查保持时间
+                let timeSincePeak = now.timeIntervalSince(columnHoldTimers[i])
+                
+                if timeSincePeak < holdDuration {
+                    // 保持期：不下降 (或者非常缓慢)
+                    // 也可以选择完全不动，模拟 "Peak Hold"
+                } else {
+                    // 释放期：线性下降
+                    // 模拟重力下落效果
+                    current -= decaySpeed
+                    
+                    // 确保不低于目标
+                    if current < target { current = target }
+                }
             }
             
-            // 加上微弱的随机抖动，增加模拟感
-            val += CGFloat.random(in: -0.02...0.02)
-            
-            // 保证最低显示第1格 (1/12 ≈ 0.08)
-            // 最高不超过 1.0
-            columnHeights[i] = max(0.08, min(1.0, val))
+            columnHeights[i] = current
         }
     }
 }

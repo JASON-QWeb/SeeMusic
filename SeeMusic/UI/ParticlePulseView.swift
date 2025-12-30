@@ -12,10 +12,22 @@ struct ParticlePulseView: View {
     @State private var smoothedClimax: CGFloat = 0.0
     @State private var time: Double = 0
     @State private var timer: Timer?
+    @State private var rotationAngle: Double = 0
+    @State private var rotationDirection: Double = 1
+    @State private var nextRotationSwitch: Double = 0
     
     // 粒子数据
     @State private var particles: [Particle] = []
     private let particleCount = 220
+    
+    private typealias PaletteStop = (h: CGFloat, s: CGFloat, b: CGFloat)
+    private let paletteStops: [PaletteStop] = [
+        (h: 0.56, s: 0.80, b: 0.68),
+        (h: 0.62, s: 0.78, b: 0.70),
+        (h: 0.72, s: 0.82, b: 0.72),
+        (h: 0.84, s: 0.80, b: 0.70),
+        (h: 0.52, s: 0.82, b: 0.66)
+    ]
     
     struct Particle: Identifiable {
         let id = UUID()

@@ -8,7 +8,10 @@
 - **范围**：音量越大，震动范围从中心扩展到边缘
 - **冲击**：节拍触发“冲击环”向外扩散
 - **边缘固定**：边缘振幅被抑制，强调膜面张力
-- **配色**：霓虹蓝紫，去除外发光/外框
+- **呼吸**：无声时为呼吸灯效果，避免全暗
+- **柔光**：粒子带轻微柔和光晕（不夸张）
+- **旋转**：整体顺时针旋转，随机 20-30s 切换为逆时针循环
+- **配色**：霓虹渐变色，缓慢切换多套主题色
 
 ---
 
@@ -77,6 +80,12 @@ envelope = range * edgeDamp
 beatSoft = pow(beat, 1.2)          // 压缩尖峰
 ```
 
+### 无声呼吸（避免全暗）
+```swift
+idle = clamp((0.06 - rms) / 0.06, 0, 1)
+breath = (0.5 + 0.5 * sin(t * 1.1)) * idle
+```
+
 ### 频率（音量越大跳动越快）
 ```swift
 freq = 2.8 + rms * 6.0 + beatSoft * 8.0
@@ -84,7 +93,7 @@ freq = 2.8 + rms * 6.0 + beatSoft * 8.0
 
 ### 震幅
 ```swift
-amp = 0.03 + rms * 0.10 + beatSoft * 0.05 + climax * 0.08
+amp = 0.03 + rms * 0.10 + beatSoft * 0.05 + climax * 0.08 + breath * 0.02
 ```
 
 ### 鼓面波形（主模态 + 次模态）
@@ -109,11 +118,14 @@ bulge = clamp(z, -0.18, 0.18)
 
 ---
 
-## 6. 位置映射（鼓面鼓起）
+## 6. 位置映射（鼓面鼓起 + 整体旋转）
 
 ```swift
-x = center.x + cos(angle + jitter) * radius * r * (1 + bulge)
-y = center.y + sin(angle + jitter) * radius * r * (1 + bulge)
+rotation += dir * speed * dt
+if t >= nextSwitch: dir *= -1; nextSwitch = t + random(20..30)
+
+x = center.x + cos(angle + jitter + rotation) * radius * r * (1 + bulge)
+y = center.y + sin(angle + jitter + rotation) * radius * r * (1 + bulge)
 ```
 
 ---
@@ -122,18 +134,26 @@ y = center.y + sin(angle + jitter) * radius * r * (1 + bulge)
 
 ```swift
 size = baseSize * (0.75 + rms * 0.35 + bulge * 1.6)
-opacity = clamp(0.25 + rms * 0.35 + bulge * 0.9, 0.12, 1.0)
+opacity = clamp(0.25 + rms * 0.35 + bulge * 0.9 + breath * 0.12, 0.12, 1.0)
 ```
 
 ---
 
-## 8. 颜色（霓虹蓝紫）
+## 8. 颜色（霓虹渐变调色板）
 
 ```swift
+palette = [
+  (h: 0.56, s: 0.80, b: 0.68),   // 青
+  (h: 0.62, s: 0.78, b: 0.70),   // 蓝
+  (h: 0.72, s: 0.82, b: 0.72),   // 紫
+  (h: 0.84, s: 0.80, b: 0.70),   // 洋红
+  (h: 0.52, s: 0.82, b: 0.66)    // 蓝绿
+]
+base = lerp(palette, phase = (t * 0.025 + r * 0.12 + angle * 0.08))
 Color(
-    hue: 0.64 + r * 0.08 + bulge * 0.08,        // 蓝紫渐变
-    saturation: 0.72 + rms * 0.18,
-    brightness: 0.25 + rms * 0.50 + bulge * 0.6
+    hue: base.h + bulge * 0.06,
+    saturation: base.s + rms * 0.12,
+    brightness: base.b + rms * 0.25 + bulge * 0.55 + breath * 0.20
 )
 ```
 
@@ -141,7 +161,8 @@ Color(
 
 ## 9. 渲染层次
 
-1. **核心粒子**：`opacity`，原始尺寸（无外发光/外框）
+1. **柔和光晕**：`opacity * 0.12`，尺寸 `× 1.6`
+2. **核心粒子**：`opacity`，原始尺寸
 
 ---
 
@@ -150,9 +171,10 @@ Color(
 ```css
 :root {
   --drum-size: 200px;
-  --drum-core: hsl(226 90% 62%);
-  --drum-core-2: hsl(270 85% 66%);
-  --drum-bg: radial-gradient(circle at center, #10142c 0%, #080a16 55%, #030305 100%);
+  --drum-core: hsl(216 90% 62%);
+  --drum-core-2: hsl(264 85% 66%);
+  --drum-core-3: hsl(312 80% 62%);
+  --drum-bg: radial-gradient(circle at center, #10142c 0%, #0a0c1f 55%, #04040a 100%);
 }
 
 .drumhead-stage {
@@ -169,8 +191,9 @@ Color(
 .drumhead-particle {
   position: absolute;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--drum-core), var(--drum-core-2));
+  background: linear-gradient(135deg, var(--drum-core), var(--drum-core-2), var(--drum-core-3));
   mix-blend-mode: screen;
+  box-shadow: 0 0 6px 1px rgba(120, 140, 255, 0.20);
 }
 ```
 
