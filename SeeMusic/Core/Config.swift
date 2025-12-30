@@ -80,14 +80,14 @@ class Config: ObservableObject {
     
     enum FrameRateMode: String, CaseIterable {
         case performance = "节能"   // 30 FPS
-        case balanced = "平衡"      // 45 FPS
-        case smooth = "丝滑"        // 60 FPS
+        case balanced = "标准"      // 60 FPS（默认）
+        case smooth = "丝滑"        // 120 FPS
         
         var fps: Double {
             switch self {
             case .performance: return 30
-            case .balanced: return 45
-            case .smooth: return 60
+            case .balanced: return 60
+            case .smooth: return 120
             }
         }
     }
@@ -104,7 +104,7 @@ class Config: ObservableObject {
         self.lowAttackMs = UserDefaults.standard.object(forKey: "lowAttackMs") as? Double ?? 30
         self.lowReleaseMs = UserDefaults.standard.object(forKey: "lowReleaseMs") as? Double ?? 150
         self.theme = Theme(rawValue: UserDefaults.standard.string(forKey: "theme") ?? "") ?? .classic
-        self.frameRateMode = FrameRateMode(rawValue: UserDefaults.standard.string(forKey: "frameRateMode") ?? "") ?? .smooth
+        self.frameRateMode = FrameRateMode(rawValue: UserDefaults.standard.string(forKey: "frameRateMode") ?? "") ?? .balanced
         self.windowWidth = UserDefaults.standard.object(forKey: "windowWidth") as? CGFloat ?? 480
         self.windowHeight = UserDefaults.standard.object(forKey: "windowHeight") as? CGFloat ?? 140
         self.showTrackInfo = UserDefaults.standard.object(forKey: "showTrackInfo") as? Bool ?? true
