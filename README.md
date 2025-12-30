@@ -15,6 +15,32 @@
 
 ---
 
+## 安装
+
+### 方式一：DMG 安装（推荐）
+
+1. 双击 `SeeMusic.dmg`
+2. 拖拽 `SeeMusic.app` → `Applications`
+3. 从 `Applications` 启动 SeeMusic
+
+> **首次启动**：需在 `系统设置` → `隐私与安全性` → `屏幕录制` 中授权 SeeMusic
+
+### 方式二：开发者模式
+
+1. 克隆仓库
+   ```bash
+   git clone https://github.com/JASON-QWeb/SeeMusic.git
+   cd SeeMusic
+   ```
+2. 使用 Xcode 打开项目
+   ```bash
+   open SeeMusic.xcodeproj
+   ```
+3. 选择 `SeeMusic` scheme，点击 ▶️ 运行
+4. 首次运行会请求屏幕录制权限，授权后重启应用
+
+---
+
 ## 使用指南
 
 - 灵敏度：律动程度
