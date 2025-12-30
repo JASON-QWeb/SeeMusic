@@ -15,18 +15,48 @@ struct ParticlePulseView: View {
     @State private var rotationAngle: Double = 0
     @State private var rotationDirection: Double = 1
     @State private var nextRotationSwitch: Double = 0
+    @State private var paletteIndex: Int = 0
+    @State private var paletteTargetIndex: Int = 0
+    @State private var paletteBlend: CGFloat = 0
+    @State private var nextPaletteSwitch: Double = 0
     
     // 粒子数据
     @State private var particles: [Particle] = []
     private let particleCount = 220
     
     private typealias PaletteStop = (h: CGFloat, s: CGFloat, b: CGFloat)
-    private let paletteStops: [PaletteStop] = [
-        (h: 0.54, s: 0.82, b: 0.70),
-        (h: 0.60, s: 0.78, b: 0.72),
-        (h: 0.70, s: 0.82, b: 0.74),
-        (h: 0.82, s: 0.80, b: 0.72),
-        (h: 0.90, s: 0.78, b: 0.70)
+    private typealias Palette = [PaletteStop]
+    private let paletteTransitionDuration: Double = 3.6
+    private let paletteSwitchRange: ClosedRange<Double> = 20...30
+    private let palettes: [Palette] = [
+        [
+            (h: 0.58, s: 0.82, b: 0.72),
+            (h: 0.62, s: 0.80, b: 0.74),
+            (h: 0.68, s: 0.82, b: 0.76),
+            (h: 0.74, s: 0.80, b: 0.74),
+            (h: 0.80, s: 0.78, b: 0.72)
+        ],
+        [
+            (h: 0.78, s: 0.82, b: 0.74),
+            (h: 0.84, s: 0.84, b: 0.76),
+            (h: 0.90, s: 0.82, b: 0.74),
+            (h: 0.96, s: 0.80, b: 0.72),
+            (h: 0.02, s: 0.78, b: 0.70)
+        ],
+        [
+            (h: 0.02, s: 0.84, b: 0.72),
+            (h: 0.05, s: 0.86, b: 0.74),
+            (h: 0.08, s: 0.86, b: 0.76),
+            (h: 0.12, s: 0.84, b: 0.76),
+            (h: 0.16, s: 0.82, b: 0.74)
+        ],
+        [
+            (h: 0.62, s: 0.80, b: 0.70),
+            (h: 0.66, s: 0.82, b: 0.72),
+            (h: 0.70, s: 0.84, b: 0.74),
+            (h: 0.76, s: 0.82, b: 0.74),
+            (h: 0.84, s: 0.80, b: 0.72)
+        ]
     ]
     
     struct Particle: Identifiable {
@@ -47,7 +77,8 @@ struct ParticlePulseView: View {
             ZStack {
                 // 粒子画布
                 Canvas { context, canvasSize in
-                    let basePhase = wrap01(time * 0.025)
+                    let paletteA = palettes[paletteIndex]
+                    let paletteB = palettes[paletteTargetIndex]
                     let idle = idleBreathLevel(rms: smoothedRMS)
                     let breath = CGFloat(0.5 + 0.5 * sin(time * 1.1)) * idle
                     let rotation = rotationAngle
@@ -65,8 +96,10 @@ struct ParticlePulseView: View {
                         )
                         
                         let anglePhase = Double((particle.angle + CGFloat(rotation)) / (2 * .pi))
-                        let colorPhase = wrap01(basePhase + Double(particle.radius) * 0.12 + anglePhase * 0.08)
-                        let palette = paletteColor(phase: colorPhase)
+                        let colorPhase = wrap01(Double(particle.radius) * 0.15 + anglePhase * 0.10)
+                        let colorA = paletteColor(phase: colorPhase, palette: paletteA)
+                        let colorB = paletteColor(phase: colorPhase, palette: paletteB)
+                        let palette = blendPalette(colorA, colorB, paletteBlend)
                         let hue = clamp(palette.h + bulge * 0.06, 0.0, 1.0)
                         let saturation = clamp(palette.s + smoothedRMS * 0.12 + breath * 0.08, 0.0, 1.0)
                         let brightness = clamp(palette.b + smoothedRMS * 0.25 + bulge * 0.55 + breath * 0.20, 0.0, 1.0)
@@ -137,6 +170,7 @@ struct ParticlePulseView: View {
             rotationAngle = 0
             rotationDirection = 1
             nextRotationSwitch = Double.random(in: 20...30)
+            setupPaletteState()
             startAnimation()
         }
         .onDisappear {
@@ -223,6 +257,7 @@ struct ParticlePulseView: View {
                 self.time += delta
                 self.updateFeatures()
                 self.updateRotation(delta: delta)
+                self.updatePalette(delta: delta)
             }
         }
         // 添加到 common mode，确保菜单栏操作时也能运行
@@ -268,20 +303,58 @@ struct ParticlePulseView: View {
         }
     }
     
-    private func paletteColor(phase: Double) -> PaletteStop {
-        let count = paletteStops.count
-        guard count > 1 else { return paletteStops.first ?? (0.6, 0.8, 0.7) }
+    private func setupPaletteState() {
+        guard !palettes.isEmpty else { return }
+        paletteIndex = Int.random(in: 0..<palettes.count)
+        paletteTargetIndex = paletteIndex
+        paletteBlend = 0
+        nextPaletteSwitch = time + Double.random(in: paletteSwitchRange)
+    }
+    
+    private func updatePalette(delta: Double) {
+        guard palettes.count > 1 else { return }
+        if paletteIndex != paletteTargetIndex {
+            let step = CGFloat(delta / paletteTransitionDuration)
+            paletteBlend = min(1.0, paletteBlend + step)
+            if paletteBlend >= 1.0 {
+                paletteIndex = paletteTargetIndex
+                paletteBlend = 0
+                nextPaletteSwitch = time + Double.random(in: paletteSwitchRange)
+            }
+            return
+        }
+        if time >= nextPaletteSwitch {
+            var nextIndex = paletteIndex
+            while nextIndex == paletteIndex {
+                nextIndex = Int.random(in: 0..<palettes.count)
+            }
+            paletteTargetIndex = nextIndex
+            paletteBlend = 0
+        }
+    }
+    
+    private func paletteColor(phase: Double, palette: Palette) -> PaletteStop {
+        let count = palette.count
+        guard count > 1 else { return palette.first ?? (0.6, 0.8, 0.7) }
         let wrapped = wrap01(phase)
         let scaled = wrapped * Double(count)
         let index = Int(floor(scaled)) % count
         let nextIndex = (index + 1) % count
         let local = CGFloat(scaled - Double(index))
-        let current = paletteStops[index]
-        let next = paletteStops[nextIndex]
+        let current = palette[index]
+        let next = palette[nextIndex]
         return (
-            h: lerp(current.h, next.h, local),
+            h: lerpHue(current.h, next.h, local),
             s: lerp(current.s, next.s, local),
             b: lerp(current.b, next.b, local)
+        )
+    }
+    
+    private func blendPalette(_ from: PaletteStop, _ to: PaletteStop, _ t: CGFloat) -> PaletteStop {
+        (
+            h: lerpHue(from.h, to.h, t),
+            s: lerp(from.s, to.s, t),
+            b: lerp(from.b, to.b, t)
         )
     }
     
@@ -291,6 +364,17 @@ struct ParticlePulseView: View {
     
     private func lerp(_ start: CGFloat, _ end: CGFloat, _ t: CGFloat) -> CGFloat {
         start + (end - start) * t
+    }
+    
+    private func lerpHue(_ start: CGFloat, _ end: CGFloat, _ t: CGFloat) -> CGFloat {
+        var delta = end - start
+        if abs(delta) > 0.5 {
+            delta = delta > 0 ? delta - 1.0 : delta + 1.0
+        }
+        var value = start + delta * t
+        if value < 0 { value += 1.0 }
+        if value > 1 { value -= 1.0 }
+        return value
     }
     
     private func wrap01(_ value: Double) -> Double {
