@@ -10,6 +10,9 @@ struct WaveView: View {
     // 平滑后的音频特征
     @State private var smoothedRMS: CGFloat = 0.02
     @State private var smoothedLowEnergy: CGFloat = 0.0
+    @State private var smoothedBeat: CGFloat = 0.0
+    @State private var smoothedClimax: CGFloat = 0.0
+    @State private var isClimax: Bool = false
     
     // 波浪参数
     private let baseAmplitude: CGFloat = 15
@@ -22,6 +25,10 @@ struct WaveView: View {
                     drawWaves(context: context, size: size)
                 }
                 .opacity(isHovering ? 0.3 : 1.0)
+
+                if config.showDebugOverlay {
+                    debugOverlay()
+                }
                 
                 // Hover 时显示隐藏按钮
                 if isHovering {
@@ -92,25 +99,40 @@ struct WaveView: View {
         let fps = config.frameRateMode.fps
         Timer.scheduledTimer(withTimeInterval: 1.0 / fps, repeats: true) { _ in
             Task { @MainActor in
-                time += 0.016
+                let dt = 1.0 / fps
+                time += dt
                 
                 // 平滑过渡音频特征
                 let targetRMS: CGFloat
                 let targetLowEnergy: CGFloat
+                let targetBeat: CGFloat
+                let targetClimax: CGFloat
+                let targetIsClimax: Bool
                 
                 if audioService.isCapturing {
                     targetRMS = CGFloat(audioService.currentFeatures.rms)
                     targetLowEnergy = CGFloat(audioService.currentFeatures.lowEnergy)
+                    targetBeat = CGFloat(audioService.currentFeatures.beat)
+                    targetClimax = CGFloat(audioService.currentFeatures.climaxLevel)
+                    targetIsClimax = audioService.currentFeatures.isClimax
                 } else {
                     // 无音频时保持极低的呼吸感
                     targetRMS = 0.02
                     targetLowEnergy = 0.0
+                    targetBeat = 0.0
+                    targetClimax = 0.0
+                    targetIsClimax = false
                 }
                 
                 // 平滑插值（避免抽搐）
                 let smoothFactor: CGFloat = 0.15
+                let beatSmooth: CGFloat = 0.45
+                let climaxSmooth: CGFloat = 0.22
                 smoothedRMS += (targetRMS - smoothedRMS) * smoothFactor
                 smoothedLowEnergy += (targetLowEnergy - smoothedLowEnergy) * smoothFactor
+                smoothedBeat += (targetBeat - smoothedBeat) * beatSmooth
+                smoothedClimax += (targetClimax - smoothedClimax) * climaxSmooth
+                isClimax = targetIsClimax
             }
         }
     }
@@ -122,6 +144,8 @@ struct WaveView: View {
         
         let rms = smoothedRMS
         let lowEnergy = smoothedLowEnergy
+        let beat = smoothedBeat
+        let climax = smoothedClimax
         
         // 波浪层配置
         let waveConfigs = getWaveConfigs()
@@ -129,16 +153,25 @@ struct WaveView: View {
         for (index, waveConfig) in waveConfigs.enumerated() {
             let sensitivity = CGFloat(config.sensitivity)
             let boost = CGFloat(config.lowEnergyBoost)
-            
-            // 计算振幅：基础呼吸 + RMS * 灵敏度 + 低频增强
-            // 静音时保持极低振幅（呼吸感）
-            let breathingAmplitude = baseAmplitude * 0.1
-            let dynamicAmplitude = baseAmplitude * waveConfig.amplitudeScale * rms * sensitivity
-            let lowBoostAmplitude = baseAmplitude * waveConfig.amplitudeScale * lowEnergy * boost * 0.3
-            let amplitude = breathingAmplitude + dynamicAmplitude + lowBoostAmplitude
-            
-            // 传播速度
-            let speedMultiplier = 1.0 + lowEnergy * boost * 0.2
+
+            let ampBase: CGFloat = 0.06
+            let ampGain: CGFloat = 0.65
+            let lowBoost: CGFloat = 0.30 * boost
+            let climaxBoost: CGFloat = 0.85
+            let beatAmp: CGFloat = 0.25
+            let sharpBase: CGFloat = 0.15
+            let sharpBeat: CGFloat = 0.70
+
+            let baseAmp = ampBase + ampGain * rms * sensitivity
+            let modeBoost = 1.0 + climaxBoost * climax
+            let lowLift = 1.0 + lowBoost * lowEnergy
+            let beatLift = 1.0 + beatAmp * beat
+            let normalizedAmp = baseAmp * modeBoost * lowLift * beatLift
+            let amplitude = baseAmplitude * waveConfig.amplitudeScale * normalizedAmp
+
+            let travelBase: Double = 40.0
+            let travel = time * travelBase * Double(waveConfig.speed)
+            let sharp = sharpBase + sharpBeat * beat
             
             // 创建波浪路径
             var path = Path()
@@ -146,14 +179,16 @@ struct WaveView: View {
             
             for x in stride(from: 0, through: width, by: step) {
                 let relativeX = x / width
-                
-                // 多重 sin 波叠加，产生传播感
-                let phase1 = relativeX * waveConfig.frequency * 2 * .pi * width - time * waveConfig.speed * speedMultiplier * 2
-                let phase2 = relativeX * waveConfig.frequency * 1.5 * 2 * .pi * width - time * waveConfig.speed * speedMultiplier * 1.5
-                let phase3 = relativeX * waveConfig.frequency * 0.7 * 2 * .pi * width - time * waveConfig.speed * speedMultiplier * 2.5
-                
+                let xValue = Double(x)
+                let k = 2 * Double.pi * Double(waveConfig.frequency)
+
+                // 多重 sin 波叠加，确保始终向右传播
+                let phase1 = k * (xValue - travel)
+                let phase2 = k * 1.5 * (xValue - travel)
+                let phase3 = k * 0.7 * (xValue - travel)
+
                 // 增加传播感的相位偏移
-                let propagationPhase = relativeX * .pi * 0.5
+                let propagationPhase = Double(relativeX) * .pi * 0.5
                 
                 // 叠加波形
                 var y = centerY
@@ -166,6 +201,10 @@ struct WaveView: View {
                 
                 // 细节波
                 y += amplitude * 0.2 * sin(phase3 + Double(index) * 0.5 + propagationPhase)
+
+                // 鼓点尖锐度
+                let sharpPhase = k * 2.8 * (xValue - travel)
+                y += amplitude * sharp * 0.22 * sin(sharpPhase + propagationPhase * 1.3)
                 
                 if x == 0 {
                     path.move(to: CGPoint(x: x, y: y))
@@ -195,6 +234,21 @@ struct WaveView: View {
                 style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
             )
         }
+    }
+
+    private func debugOverlay() -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(String(format: "rms: %.3f", smoothedRMS))
+            Text(String(format: "low: %.3f", smoothedLowEnergy))
+            Text(String(format: "beat: %.3f", smoothedBeat))
+            Text(String(format: "climax: %.3f %@", smoothedClimax, isClimax ? "ON" : "off"))
+        }
+        .font(.system(size: 11, weight: .regular, design: .monospaced))
+        .padding(8)
+        .background(Color.black.opacity(0.35))
+        .cornerRadius(6)
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     
     // 获取波浪配置（根据主题）

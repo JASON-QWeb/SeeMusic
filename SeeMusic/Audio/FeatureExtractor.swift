@@ -110,6 +110,9 @@ class FeatureExtractor {
             timestamp: CACurrentMediaTime(),
             rms: rawRMS,
             lowEnergy: lowEnergy,
+            beat: 0,
+            climaxLevel: 0,
+            isClimax: false,
             sampleRate: sampleRate
         )
     }

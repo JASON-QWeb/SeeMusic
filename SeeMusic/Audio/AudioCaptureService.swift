@@ -15,7 +15,7 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
     private var streamOutput: AudioStreamOutput?
     private var screenOutput: ScreenStreamOutput?
     private let featureExtractor = FeatureExtractor()
-    private let smoother = Smoother()
+    private let featurePipeline = FeaturePipeline()
     private var isStarting = false
     
     override init() {
@@ -30,6 +30,7 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
         }
         
         isStarting = true
+        featurePipeline.reset()
         
         do {
             print("[SeeMusic] 📡 获取屏幕信息...")
@@ -115,6 +116,7 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
             streamOutput = nil
             screenOutput = nil
             isCapturing = false
+            featurePipeline.reset()
             print("[SeeMusic] ⏹️ 音频捕获已停止")
         } catch {
             print("[SeeMusic] ❌ 停止捕获失败: \(error)")
@@ -129,20 +131,30 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
             self.stream = nil
             self.streamOutput = nil
             self.screenOutput = nil
+            self.featurePipeline.reset()
         }
     }
     
     // 处理音频 buffer
     private var logCounter = 0
     private func processAudioBuffer(_ buffer: CMSampleBuffer) {
-        var rawFeatures = featureExtractor.extractFeatures(from: buffer)
-        rawFeatures = smoother.smooth(rawFeatures)
-        currentFeatures = rawFeatures
+        let rawFeatures = featureExtractor.extractFeatures(from: buffer)
+        let params = FeaturePipeline.Parameters(
+            rmsGain: Float(Config.shared.rmsGain),
+            lowGain: Float(Config.shared.lowGain),
+            beatDiffGain: Float(Config.shared.beatBoost),
+            rmsAttackMs: Config.shared.rmsAttackMs,
+            rmsReleaseMs: Config.shared.rmsReleaseMs,
+            lowAttackMs: Config.shared.lowAttackMs,
+            lowReleaseMs: Config.shared.lowReleaseMs
+        )
+        let processed = featurePipeline.process(rawFeatures, parameters: params)
+        currentFeatures = processed
         
         logCounter += 1
         if logCounter >= 60 {
             logCounter = 0
-            print("[SeeMusic] 🎵 音频: RMS=\(String(format: "%.4f", rawFeatures.rms)), Low=\(String(format: "%.4f", rawFeatures.lowEnergy))")
+            print("[SeeMusic] 🎵 音频: RMS=\(String(format: "%.4f", processed.rms)), Low=\(String(format: "%.4f", processed.lowEnergy))")
         }
     }
 }

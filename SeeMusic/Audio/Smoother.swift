@@ -98,6 +98,9 @@ class Smoother {
             timestamp: currentTime,
             rms: smoothedRMS,
             lowEnergy: smoothedLowEnergy,
+            beat: 0,
+            climaxLevel: 0,
+            isClimax: false,
             sampleRate: features.sampleRate
         )
     }

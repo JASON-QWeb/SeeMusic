@@ -17,6 +17,7 @@
 		008 /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109; };
 		009 /* FeatureExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110; };
 		010 /* Smoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111; };
+		015 /* FeaturePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116; };
 		011 /* NowPlayingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112; };
 		012 /* TrackInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113; };
 		013 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114; };
@@ -36,6 +37,7 @@
 		109 /* AudioCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureService.swift; sourceTree = "<group>"; };
 		110 /* FeatureExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureExtractor.swift; sourceTree = "<group>"; };
 		111 /* Smoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Smoother.swift; sourceTree = "<group>"; };
+		116 /* FeaturePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeaturePipeline.swift; sourceTree = "<group>"; };
 		112 /* NowPlayingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingService.swift; sourceTree = "<group>"; };
 		113 /* TrackInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackInfoView.swift; sourceTree = "<group>"; };
 		114 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -110,6 +112,7 @@
 				109 /* AudioCaptureService.swift */,
 				110 /* FeatureExtractor.swift */,
 				111 /* Smoother.swift */,
+				116 /* FeaturePipeline.swift */,
 			);
 			path = Audio;
 			sourceTree = "<group>";
@@ -210,6 +213,7 @@
 				008 /* AudioCaptureService.swift in Sources */,
 				009 /* FeatureExtractor.swift in Sources */,
 				010 /* Smoother.swift in Sources */,
+				015 /* FeaturePipeline.swift in Sources */,
 				011 /* NowPlayingService.swift in Sources */,
 				012 /* TrackInfoView.swift in Sources */,
 				013 /* ContentView.swift in Sources */,
