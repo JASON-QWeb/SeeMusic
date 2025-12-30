@@ -160,6 +160,44 @@ class FloatingPanel: NSPanel {
             newFrame.size.width = min(maxSize.width, newFrame.size.width)
             newFrame.size.height = min(maxSize.height, newFrame.size.height)
             
+            // 处理正方形约束 (Proportional Resizing)
+            if Config.shared.theme.isSquare {
+                // 取最大边长作为正方形边长
+                // 或者根据拖动方向决定：
+                // 简单的策略：均取最大值，或者根据主拖动轴
+                
+                var sideLength = max(newFrame.width, newFrame.height)
+                
+                // 再次检查约束
+                sideLength = max(sideLength, minSize.width)
+                sideLength = min(sideLength, maxSize.height)
+                
+                // 调整 Frame
+                // 如果是左边或上边拖动，需要修正 origin
+                if resizeEdge == .left || resizeEdge == .topLeft || resizeEdge == .bottomLeft {
+                     // 修正 x: 保持右边缘不变 -> newX = right - newWidth
+                     let right = newFrame.maxX
+                     newFrame.origin.x = right - sideLength
+                }
+                
+                if resizeEdge == .top || resizeEdge == .topLeft || resizeEdge == .topRight {
+                    // 修正 y: 由于 Cocoa 坐标系 bottom-left 0,0，top 变化通常改变 height
+                    // 但 window frame y 是底部位置。
+                    // 拖动 top 改变 height，bottom (y) 不变。
+                    // 所以不需要修正 y?
+                    // 等等，如果拖动 Top，height 变大，y 不变，top 变高。Correct.
+                }
+                
+                if resizeEdge == .bottom || resizeEdge == .bottomLeft || resizeEdge == .bottomRight {
+                     // 拖动 Bottom，height 变大，y 需要减小 (向下延伸) -> newY = top - newHeight
+                     let top = newFrame.maxY
+                     newFrame.origin.y = top - sideLength
+                }
+                
+                newFrame.size.width = sideLength
+                newFrame.size.height = sideLength
+            }
+            
             self.setFrame(newFrame, display: true)
             
             // 更新 Config 中的窗口尺寸
@@ -210,9 +248,19 @@ class FloatingWindowController: NSWindowController {
         // 恢复窗口位置
         if let savedFrame = UserDefaults.standard.string(forKey: "windowFrame") {
             panel.setFrame(from: savedFrame)
+            
+            // 确保尺寸与 Config 同步 (或重置为推荐尺寸)
+            // 这里我们优先信任 Config 的值，如果它存在且合理
+            let configWidth = Config.shared.windowWidth
+            let configHeight = Config.shared.windowHeight
+            
+            // 如果是正方形主题，强制正方形
             if theme.isSquare {
-                resizeWindow(to: size)
+                 panel.setContentSize(NSSize(width: configWidth, height: configWidth))
+            } else {
+                 panel.setContentSize(NSSize(width: configWidth, height: configHeight))
             }
+
         } else {
             if let screen = NSScreen.main {
                 let screenRect = screen.visibleFrame
@@ -255,6 +303,10 @@ class FloatingWindowController: NSWindowController {
     private func handleThemeChange() {
         let size = Config.shared.theme.recommendedSize
         resizeWindow(to: size)
+        
+        // 关键：同步更新 Config，确保 ContentView 响应
+        Config.shared.windowWidth = size.width
+        Config.shared.windowHeight = size.height
     }
     
     private func resizeWindow(to size: (width: CGFloat, height: CGFloat)) {

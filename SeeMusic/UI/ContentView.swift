@@ -34,8 +34,8 @@ struct ContentView: View {
             }
         }
         .frame(
-            width: config.theme.recommendedSize.width,
-            height: config.theme.recommendedSize.height
+            width: config.windowWidth,
+            height: config.windowHeight
         )
         .onHover { isHovering in
             withAnimation(.easeInOut(duration: 0.2)) {

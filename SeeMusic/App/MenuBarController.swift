@@ -116,17 +116,17 @@ class MenuBarController {
         fpsItem.submenu = fpsMenu
         menu.addItem(fpsItem)
         
-        // 显示曲目信息
-        let showTrackItem = NSMenuItem(
-            title: "显示曲目信息",
-            action: #selector(toggleTrackInfo),
-            keyEquivalent: ""
-        )
-        showTrackItem.target = self
-        showTrackItem.state = Config.shared.showTrackInfo ? .on : .off
-        menu.addItem(showTrackItem)
+        // 显示曲目信息 权限未解决
+        // let showTrackItem = NSMenuItem(
+        //     title: "显示曲目信息",
+        //     action: #selector(toggleTrackInfo),
+        //     keyEquivalent: ""
+        // )
+        // showTrackItem.target = self
+        // showTrackItem.state = Config.shared.showTrackInfo ? .on : .off
+        // menu.addItem(showTrackItem)
         
-        menu.addItem(NSMenuItem.separator())
+        // menu.addItem(NSMenuItem.separator())
         
         // 退出
         let quitItem = NSMenuItem(
