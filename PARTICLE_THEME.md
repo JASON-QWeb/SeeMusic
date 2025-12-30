@@ -58,8 +58,8 @@ let θ = t * golden
 
 ```swift
 let smoothFactor: CGFloat = 0.20   // RMS 平滑
-let beatAttack: CGFloat = 0.28     // Beat 起音（更柔和）
-let beatRelease: CGFloat = 0.12    // Beat 释音（消除突兀震颤）
+let beatAttack: CGFloat = 0.24     // Beat 起音（更柔和）
+let beatRelease: CGFloat = 0.10    // Beat 释音（消除突兀震颤）
 let climaxFactor: CGFloat = 0.25   // Climax 平滑
 ```
 
@@ -77,7 +77,8 @@ envelope = range * edgeDamp
 
 ### Beat 软化（避免突然震颤）
 ```swift
-beatSoft = pow(beat, 1.2)          // 压缩尖峰
+beatGate = clamp((rms - 0.03) / 0.06, 0, 1)
+beatSoft = pow(beat, 1.3) * beatGate    // 压缩尖峰，抑制静音抖动
 ```
 
 ### 无声呼吸（避免全暗）
@@ -88,12 +89,12 @@ breath = (0.5 + 0.5 * sin(t * 1.1)) * idle
 
 ### 频率（音量越大跳动越快）
 ```swift
-freq = 2.8 + rms * 6.0 + beatSoft * 8.0
+freq = 2.6 + rms * 5.5 + beatSoft * 6.0
 ```
 
 ### 震幅
 ```swift
-amp = 0.03 + rms * 0.10 + beatSoft * 0.05 + climax * 0.08 + breath * 0.02
+amp = 0.03 + rms * 0.10 + beatSoft * 0.04 + climax * 0.08 + breath * 0.02
 ```
 
 ### 鼓面波形（主模态 + 次模态）
@@ -106,8 +107,8 @@ harmonic = 0.4 * sin(t * freq * 1.7 + r * 9 + phase * 1.3)
 ```swift
 ringPos = (t * ringSpeed) % 1
 ringSpeed = 0.9 + rms * 0.6
-ringWidth = 0.10 + rms * 0.08
-impact = beatSoft * exp(-((r - ringPos) / ringWidth)^2) * 0.14 * edgeDamp
+ringWidth = 0.12 + rms * 0.10
+impact = beatSoft * exp(-((r - ringPos) / ringWidth)^2) * 0.12 * edgeDamp
 ```
 
 ### 最终位移（鼓面鼓起/下陷）
@@ -121,6 +122,7 @@ bulge = clamp(z, -0.18, 0.18)
 ## 6. 位置映射（鼓面鼓起 + 整体旋转）
 
 ```swift
+speed = 0.10 + rms * 0.08
 rotation += dir * speed * dt
 if t >= nextSwitch: dir *= -1; nextSwitch = t + random(20..30)
 
@@ -133,7 +135,7 @@ y = center.y + sin(angle + jitter + rotation) * radius * r * (1 + bulge)
 ## 7. 大小与透明度
 
 ```swift
-size = baseSize * (0.75 + rms * 0.35 + bulge * 1.6)
+size = baseSize * (0.75 + rms * 0.35 + bulge * 1.6 + breath * 0.12)
 opacity = clamp(0.25 + rms * 0.35 + bulge * 0.9 + breath * 0.12, 0.12, 1.0)
 ```
 
@@ -143,11 +145,11 @@ opacity = clamp(0.25 + rms * 0.35 + bulge * 0.9 + breath * 0.12, 0.12, 1.0)
 
 ```swift
 palette = [
-  (h: 0.56, s: 0.80, b: 0.68),   // 青
-  (h: 0.62, s: 0.78, b: 0.70),   // 蓝
-  (h: 0.72, s: 0.82, b: 0.72),   // 紫
-  (h: 0.84, s: 0.80, b: 0.70),   // 洋红
-  (h: 0.52, s: 0.82, b: 0.66)    // 蓝绿
+  (h: 0.54, s: 0.82, b: 0.70),   // 青
+  (h: 0.60, s: 0.78, b: 0.72),   // 蓝
+  (h: 0.70, s: 0.82, b: 0.74),   // 紫
+  (h: 0.82, s: 0.80, b: 0.72),   // 洋红
+  (h: 0.90, s: 0.78, b: 0.70)    // 粉紫
 ]
 base = lerp(palette, phase = (t * 0.025 + r * 0.12 + angle * 0.08))
 Color(

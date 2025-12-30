@@ -77,8 +77,8 @@ class MenuBarController {
         
         // 2. 脉冲主题组
         let pulseMenu = NSMenu()
-        // 绿色 (Particle)
-        addItem(to: pulseMenu, title: "绿色", theme: .particle)
+        // 渐变 (Particle)
+        addItem(to: pulseMenu, title: "渐变", theme: .particle)
         
         let pulseItem = NSMenuItem(title: "脉冲", action: nil, keyEquivalent: "")
         pulseItem.submenu = pulseMenu

@@ -110,33 +110,60 @@ struct EqualizerView: View {
         let activeIndex = Int(height * CGFloat(blockCount))
         return block < activeIndex
     }
-    
-    // 方块颜色
+    // 方块颜色：红黄绿渐变，叠加亮度渐变
     private func blockColor(blockIndex: Int, isActive: Bool) -> Color {
-        let normalizedIndex = CGFloat(blockIndex) / CGFloat(blockCount - 1)
+        // 归一化索引 (0.0 - 1.0)
+        let normalized = CGFloat(blockIndex) / CGFloat(blockCount - 1)
         
         if !isActive {
-            // 未激活：底深灰 -> 顶极淡灰
-            let inactiveOpacity = 0.5 - normalizedIndex * 0.45
+            // 未激活：底深灰 (0.6) -> 顶极淡灰 (0.1)
+            // 这种渐变能让背景更有层次感，像是一个未点亮的音响面板
+            let inactiveOpacity = 0.6 - normalized * 0.5
             return Color.black.opacity(inactiveOpacity)
         }
         
-        // 基础色相 (Hue)
-        let baseColor: Color
-        if blockIndex >= blockCount - 2 {
-            // Top 2: 红色
-            baseColor = Color(red: 1.0, green: 0.2, blue: 0.2)
-        } else if blockIndex >= blockCount - 5 {
-            // Mid 3: 黄色
-            baseColor = Color(red: 1.0, green: 0.85, blue: 0.0)
+        // 1. 颜色分布 (Color Distribution)
+        // 共12格：
+        // Top 3 (9, 10, 11) -> 红色
+        // Mid 4 (5, 6, 7, 8) -> 黄色
+        // Bottom 5 (0, 1, 2, 3, 4) -> 绿色
+        var baseHue: Double
+        
+        if blockIndex >= 9 {
+            // Top 3: Red
+            baseHue = 0.0 // 纯红
+        } else if blockIndex >= 5 {
+            // Mid 4: Yellow
+            baseHue = 0.14 // 金黄
         } else {
-            // Bottom: 绿色
-            baseColor = Color(red: 0.2, green: 1.0, blue: 0.4)
+            // Bottom 5: Green
+            baseHue = 0.35 // 鲜绿
         }
         
-        // 渐变效果：底部深厚，顶部淡化
-        let fadeFactor = 1.0 - normalizedIndex * 0.4
-        return baseColor.opacity(fadeFactor)
+        // 2. 渐变效果 (Gradient Aesthetics)
+        // "最底下最深 (Deep) -> 最上面最淡 (Light)"
+        
+        // 饱和度 (Saturation): 底部高，顶部低
+        // 亮度 (Brightness): 底部稍暗(深厚)，顶部全亮
+        // 透明度 (Opacity): 底部不透明，顶部半透明(淡化)
+        
+        // 全局渐变因子 (0: Bottom, 1: Top)
+        let globalFactor = normalized
+        
+        // 饱和度：0.95 -> 0.6 (顶部变淡白)
+        let saturation = 0.95 - globalFactor * 0.35
+        
+        // 亮度：0.8(深厚) -> 1.0(亮)
+        let brightness = 0.8 + globalFactor * 0.2
+        
+        // 透明度：1.0 -> 0.7 (顶部半透明效果)
+        let opacity = 1.0 - globalFactor * 0.3
+        
+        // 微调颜色
+        return Color(hue: baseHue,
+                    saturation: saturation,
+                    brightness: brightness)
+                .opacity(opacity)
     }
     
     // 启动动画
