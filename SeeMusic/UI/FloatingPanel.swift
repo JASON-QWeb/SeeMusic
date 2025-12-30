@@ -4,10 +4,6 @@ import SwiftUI
 // 悬浮窗面板 - 透明、无边框、置顶、可拖拽、可调整大小
 class FloatingPanel: NSPanel {
     
-    private var isDragging = false
-    private var initialMouseLocation: NSPoint = .zero
-    private var initialWindowOrigin: NSPoint = .zero
-    
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
@@ -24,8 +20,8 @@ class FloatingPanel: NSPanel {
         self.backgroundColor = .clear
         self.hasShadow = false
         
-        // 可移动设置 - 禁用系统背景移动，改为手动控制以解决冲突
-        self.isMovableByWindowBackground = false
+        // 允许在窗口背景拖动，保持按钮可点击
+        self.isMovableByWindowBackground = true
         
         // 隐藏标题栏但保持功能
         self.titleVisibility = .hidden
@@ -44,48 +40,6 @@ class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
     
-    override func sendEvent(_ event: NSEvent) {
-        switch event.type {
-        case .leftMouseDown:
-            if shouldBeginDrag(with: event) {
-                let mouseLocation = NSEvent.mouseLocation
-                isDragging = true
-                initialMouseLocation = mouseLocation
-                initialWindowOrigin = self.frame.origin
-                NSCursor.closedHand.set()
-                return
-            }
-        case .leftMouseDragged:
-            if isDragging {
-                let mouseLocation = NSEvent.mouseLocation
-                let deltaX = mouseLocation.x - initialMouseLocation.x
-                let deltaY = mouseLocation.y - initialMouseLocation.y
-                let newOrigin = NSPoint(
-                    x: initialWindowOrigin.x + deltaX,
-                    y: initialWindowOrigin.y + deltaY
-                )
-                self.setFrameOrigin(newOrigin)
-                return
-            }
-        case .leftMouseUp:
-            if isDragging {
-                isDragging = false
-                NSCursor.arrow.set()
-                return
-            }
-        default:
-            break
-        }
-        super.sendEvent(event)
-    }
-    
-    private func shouldBeginDrag(with event: NSEvent) -> Bool {
-        guard let contentView = contentView else { return true }
-        let localPoint = contentView.convert(event.locationInWindow, from: nil)
-        guard let hitView = contentView.hitTest(localPoint) else { return true }
-        return !(hitView is NSControl)
-    }
-
 }
 
 // 窗口控制器
