@@ -17,7 +17,7 @@
 
 ## 安装
 
-### 方式一：DMG 安装（推荐）
+### 方式一：DMG 安装
 
 1. 双击 `SeeMusic.dmg`
 2. 拖拽 `SeeMusic.app` → `Applications`
