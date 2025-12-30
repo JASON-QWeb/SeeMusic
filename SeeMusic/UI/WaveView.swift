@@ -36,7 +36,7 @@ struct WaveView: View {
                         Button(action: hideWindow) {
                             HStack(spacing: 6) {
                                 Image(systemName: "eye.slash")
-                                Text("隐藏波浪")
+                                Text("隐藏")
                             }
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white)
@@ -125,9 +125,9 @@ struct WaveView: View {
                 }
                 
                 // 平滑插值（柔和过渡，避免抽搐）
-                let smoothFactor: CGFloat = 0.18
-                let beatSmooth: CGFloat = 0.35
-                let climaxSmooth: CGFloat = 0.25
+                let smoothFactor: CGFloat = 0.12
+                let beatSmooth: CGFloat = 0.25
+                let climaxSmooth: CGFloat = 0.18
                 smoothedRMS += (targetRMS - smoothedRMS) * smoothFactor
                 smoothedLowEnergy += (targetLowEnergy - smoothedLowEnergy) * smoothFactor
                 smoothedBeat += (targetBeat - smoothedBeat) * beatSmooth
@@ -156,7 +156,7 @@ struct WaveView: View {
 
             let ampBase: CGFloat = 0.008      // 极低基础振幅
             let ampGain: CGFloat = 0.5       // 提高增益
-            let vocalBoost: CGFloat = 1.0 * boost  // 人声增益大幅提高
+            let vocalBoost: CGFloat = 1.2 * boost  // 人声增益大幅提高
             let climaxBoost: CGFloat = 0.8   // 高潮加成提高
             let beatAmp: CGFloat = 0.45       // 节拍脉冲提高
             let sharpBase: CGFloat = 0.10
@@ -164,7 +164,7 @@ struct WaveView: View {
 
             // 人声能量作为主要驱动
             let vocalDrive = lowEnergy
-            let baseAmp = ampBase + ampGain * rms * sensitivity * (0.25 + vocalDrive * 0.75)
+            let baseAmp = ampBase + ampGain * rms * sensitivity * (0.10 + vocalDrive * 0.90)
             let vocalLift = 1.0 + vocalBoost * vocalDrive
             let modeBoost = 1.0 + climaxBoost * climax
             let beatLift = 1.0 + beatAmp * beat

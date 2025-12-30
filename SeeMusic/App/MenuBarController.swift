@@ -31,7 +31,7 @@ class MenuBarController {
         
         // 显示/隐藏窗口
         let toggleItem = NSMenuItem(
-            title: "显示/隐藏波浪",
+            title: "显示/隐藏",
             action: #selector(toggleWindow),
             keyEquivalent: "w"
         )
