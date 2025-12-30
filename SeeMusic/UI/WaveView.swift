@@ -124,10 +124,10 @@ struct WaveView: View {
                     targetIsClimax = false
                 }
                 
-                // 平滑插值（避免抽搐）
-                let smoothFactor: CGFloat = 0.15
-                let beatSmooth: CGFloat = 0.45
-                let climaxSmooth: CGFloat = 0.22
+                // 平滑插值（柔和过渡，避免抽搐）
+                let smoothFactor: CGFloat = 0.18
+                let beatSmooth: CGFloat = 0.35
+                let climaxSmooth: CGFloat = 0.25
                 smoothedRMS += (targetRMS - smoothedRMS) * smoothFactor
                 smoothedLowEnergy += (targetLowEnergy - smoothedLowEnergy) * smoothFactor
                 smoothedBeat += (targetBeat - smoothedBeat) * beatSmooth
@@ -154,20 +154,24 @@ struct WaveView: View {
             let sensitivity = CGFloat(config.sensitivity)
             let boost = CGFloat(config.lowEnergyBoost)
 
-            let ampBase: CGFloat = 0.06
-            let ampGain: CGFloat = 0.65
-            let lowBoost: CGFloat = 0.30 * boost
-            let climaxBoost: CGFloat = 0.85
-            let beatAmp: CGFloat = 0.25
-            let sharpBase: CGFloat = 0.15
+            let ampBase: CGFloat = 0.008      // 极低基础振幅
+            let ampGain: CGFloat = 0.5       // 提高增益
+            let vocalBoost: CGFloat = 1.0 * boost  // 人声增益大幅提高
+            let climaxBoost: CGFloat = 0.8   // 高潮加成提高
+            let beatAmp: CGFloat = 0.45       // 节拍脉冲提高
+            let sharpBase: CGFloat = 0.10
             let sharpBeat: CGFloat = 0.70
 
-            let baseAmp = ampBase + ampGain * rms * sensitivity
+            // 人声能量作为主要驱动
+            let vocalDrive = lowEnergy
+            let baseAmp = ampBase + ampGain * rms * sensitivity * (0.25 + vocalDrive * 0.75)
+            let vocalLift = 1.0 + vocalBoost * vocalDrive
             let modeBoost = 1.0 + climaxBoost * climax
-            let lowLift = 1.0 + lowBoost * lowEnergy
             let beatLift = 1.0 + beatAmp * beat
-            let normalizedAmp = baseAmp * modeBoost * lowLift * beatLift
-            let amplitude = baseAmplitude * waveConfig.amplitudeScale * normalizedAmp
+            let normalizedAmp = baseAmp * vocalLift * modeBoost * beatLift  // 不限制，让边界裁剪处理
+            // 限制振幅不超出窗口（留出边距）
+            let maxAmplitude = (size.height / 2) * 0.8  // 使用80%的空间
+            let amplitude = min(maxAmplitude, baseAmplitude * waveConfig.amplitudeScale * normalizedAmp)
 
             let travelBase: Double = 40.0
             let travel = time * travelBase * Double(waveConfig.speed)
@@ -205,6 +209,10 @@ struct WaveView: View {
                 // 鼓点尖锐度
                 let sharpPhase = k * 2.8 * (xValue - travel)
                 y += amplitude * sharp * 0.22 * sin(sharpPhase + propagationPhase * 1.3)
+                
+                // 裁剪Y值到窗口边界内
+                let margin: CGFloat = 2
+                y = max(margin, min(size.height - margin, y))
                 
                 if x == 0 {
                     path.move(to: CGPoint(x: x, y: y))

@@ -117,7 +117,8 @@ class FeatureExtractor {
         )
     }
     
-    // 使用 FFT 计算低频能量
+    // 使用 FFT 计算人声频段能量（300-3000 Hz 占总能量的比例）
+    // 人声出现时返回高值，纯背景音乐时返回低值
     private func calculateLowEnergyFFT(samples: [Float], sampleRate: Float) -> Float {
         guard let setup = fftSetup, !samples.isEmpty else {
             return 0
@@ -144,35 +145,47 @@ class FeatureExtractor {
         var magnitudes = [Float](repeating: 0, count: fftLength / 2)
         vDSP_zvmags(&splitComplex, 1, &magnitudes, 1, vDSP_Length(fftLength / 2))
         
-        // 低频范围 (0-250 Hz)
         let binWidth = sampleRate / Float(fftLength)
-        let lowFreqLimit: Float = 250.0
-        let lowFreqBins = Int(lowFreqLimit / binWidth)
         
-        // 中频范围 (250-2000 Hz)
-        let midFreqLimit: Float = 2000.0
-        let midFreqBins = Int(midFreqLimit / binWidth)
+        // 频段定义
+        let lowFreqLimit: Float = 300.0      // 低频上限
+        let vocalLowLimit: Float = 300.0     // 人声下限
+        let vocalHighLimit: Float = 3500.0   // 人声上限
+        let highFreqLimit: Float = 8000.0    // 高频上限
         
-        // 计算低频能量
+        let lowBins = Int(lowFreqLimit / binWidth)
+        let vocalLowBins = Int(vocalLowLimit / binWidth)
+        let vocalHighBins = Int(vocalHighLimit / binWidth)
+        let highBins = Int(highFreqLimit / binWidth)
+        
+        // 计算各频段能量
         var lowSum: Float = 0
-        for i in 1..<min(lowFreqBins, magnitudes.count) {
+        for i in 1..<min(lowBins, magnitudes.count) {
             lowSum += magnitudes[i]
         }
         
-        // 计算中高频能量
-        var midHighSum: Float = 0
-        for i in lowFreqBins..<min(midFreqBins, magnitudes.count) {
-            midHighSum += magnitudes[i]
+        var vocalSum: Float = 0
+        for i in vocalLowBins..<min(vocalHighBins, magnitudes.count) {
+            vocalSum += magnitudes[i]
         }
         
-        // 低中频总和作为分母
-        let total = lowSum + midHighSum
+        var highSum: Float = 0
+        for i in vocalHighBins..<min(highBins, magnitudes.count) {
+            highSum += magnitudes[i]
+        }
+        
+        // 总能量
+        let total = lowSum + vocalSum + highSum
         guard total > 0.001 else { return 0 }
         
-        // 计算低频占比（0-1）
-        let lowRatio = lowSum / total
+        // 人声频段占比 - 人声出现时这个值高，纯伴奏时这个值低
+        let vocalRatio = vocalSum / total
         
-        // 返回标准化的低频能量
-        return min(1.0, max(0.0, lowRatio))
+        // 对人声占比做非线性映射，增强对比度
+        // 典型纯伴奏 vocalRatio ~ 0.3-0.4，人声 ~ 0.5-0.7
+        let normalized = (vocalRatio - 0.25) / 0.45  // 映射到 0-1 范围
+        let enhanced = powf(max(0, normalized), 0.8)  // 压缩提升对比度
+        
+        return min(1.0, max(0.0, enhanced))
     }
 }

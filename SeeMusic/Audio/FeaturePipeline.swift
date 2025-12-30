@@ -17,18 +17,18 @@ final class FeaturePipeline {
     private let nfMargin: Float = 0.015
     private let nfFreezeRms: Float = 0.03
 
-    // Normalize + Compress
-    private let gammaRms: Float = 0.60
-    private let gammaLow: Float = 0.70
+    // Normalize + Compress（强对比度：安静更安静，响亮更响亮）
+    private let gammaRms: Float = 1.50
+    private let gammaLow: Float = 1.60
 
     // Beat + Climax
     private let beatRmsRatio: Float = 0.65
-    private let beatGate: Float = 0.08
-    private let windowSec: Double = 0.8
-    private let climaxAttackMs: Double = 180
-    private let climaxReleaseMs: Double = 700
-    private let hystOn: Float = 0.60
-    private let hystOff: Float = 0.45
+    private let beatGate: Float = 0.05
+    private let windowSec: Double = 0.5
+    private let climaxAttackMs: Double = 100
+    private let climaxReleaseMs: Double = 350
+    private let hystOn: Float = 0.50
+    private let hystOff: Float = 0.35
 
     // State
     private var noiseFloor: Float = 0
@@ -140,10 +140,10 @@ final class FeaturePipeline {
         let count = Float(energyWindow.count)
         let mean = sum / count
 
-        let m = clamp01((mean - 0.35) / 0.50)
-        let p = clamp01((peak - 0.55) / 0.35)
+        let m = clamp01((mean - 0.20) / 0.60)
+        let p = clamp01((peak - 0.40) / 0.50)
 
-        return 0.70 * m + 0.30 * p
+        return 0.60 * m + 0.40 * p
     }
 
     private func alpha(dt: Double, ms: Double) -> Float {

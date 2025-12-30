@@ -99,10 +99,10 @@ class Config: ObservableObject {
         self.rmsGain = UserDefaults.standard.object(forKey: "rmsGain") as? Double ?? 3.0
         self.lowGain = UserDefaults.standard.object(forKey: "lowGain") as? Double ?? 2.2
         self.beatBoost = UserDefaults.standard.object(forKey: "beatBoost") as? Double ?? 2.4
-        self.rmsAttackMs = UserDefaults.standard.object(forKey: "rmsAttackMs") as? Double ?? 60
-        self.rmsReleaseMs = UserDefaults.standard.object(forKey: "rmsReleaseMs") as? Double ?? 320
-        self.lowAttackMs = UserDefaults.standard.object(forKey: "lowAttackMs") as? Double ?? 35
-        self.lowReleaseMs = UserDefaults.standard.object(forKey: "lowReleaseMs") as? Double ?? 220
+        self.rmsAttackMs = UserDefaults.standard.object(forKey: "rmsAttackMs") as? Double ?? 40
+        self.rmsReleaseMs = UserDefaults.standard.object(forKey: "rmsReleaseMs") as? Double ?? 180
+        self.lowAttackMs = UserDefaults.standard.object(forKey: "lowAttackMs") as? Double ?? 30
+        self.lowReleaseMs = UserDefaults.standard.object(forKey: "lowReleaseMs") as? Double ?? 150
         self.theme = Theme(rawValue: UserDefaults.standard.string(forKey: "theme") ?? "") ?? .classic
         self.frameRateMode = FrameRateMode(rawValue: UserDefaults.standard.string(forKey: "frameRateMode") ?? "") ?? .smooth
         self.windowWidth = UserDefaults.standard.object(forKey: "windowWidth") as? CGFloat ?? 480
