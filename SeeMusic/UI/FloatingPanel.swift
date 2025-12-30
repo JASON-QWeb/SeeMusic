@@ -33,8 +33,8 @@ class FloatingPanel: NSPanel {
         self.backgroundColor = .clear
         self.hasShadow = true
         
-        // 可移动设置
-        self.isMovableByWindowBackground = true
+        // 可移动设置 - 禁用系统背景移动，改为手动控制以解决冲突
+        self.isMovableByWindowBackground = false
         
         // 隐藏标题栏但保持功能
         self.titleVisibility = .hidden
@@ -53,15 +53,22 @@ class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
     
+    // 状态
+    private var isDragging = false
+    private var initialWindowOrigin: NSPoint = .zero
+    
     // 检测鼠标位置对应的调整边缘
     private func detectResizeEdge(at point: NSPoint) -> ResizeEdge {
         let frame = self.frame
         let localPoint = NSPoint(x: point.x - frame.origin.x, y: point.y - frame.origin.y)
         
-        let nearLeft = localPoint.x < resizeEdgeSize
-        let nearRight = localPoint.x > frame.width - resizeEdgeSize
-        let nearBottom = localPoint.y < resizeEdgeSize
-        let nearTop = localPoint.y > frame.height - resizeEdgeSize
+        // 增加边缘检测范围，让操作更容易
+        let edgeSize: CGFloat = 12 
+        
+        let nearLeft = localPoint.x < edgeSize
+        let nearRight = localPoint.x > frame.width - edgeSize
+        let nearBottom = localPoint.y < edgeSize
+        let nearTop = localPoint.y > frame.height - edgeSize
         
         if nearLeft && nearBottom { return .bottomLeft }
         if nearRight && nearBottom { return .bottomRight }
@@ -83,9 +90,9 @@ class FloatingPanel: NSPanel {
         case .top, .bottom:
             NSCursor.resizeUpDown.set()
         case .topLeft, .bottomRight:
-            NSCursor.crosshair.set()
+            NSCursor._windowResizeNorthWestSouthEastCursor.set()
         case .topRight, .bottomLeft:
-            NSCursor.crosshair.set()
+            NSCursor._windowResizeNorthEastSouthWestCursor.set()
         case .none:
             NSCursor.arrow.set()
         }
@@ -95,7 +102,9 @@ class FloatingPanel: NSPanel {
         let mouseLocation = NSEvent.mouseLocation
         let edge = detectResizeEdge(at: mouseLocation)
         setCursor(for: edge)
-        super.mouseMoved(with: event)
+        
+        // 我们不需要调用 super.mouseMoved，因为我们接管了
+        // super.mouseMoved(with: event) 
     }
     
     override func mouseDown(with event: NSEvent) {
@@ -103,22 +112,32 @@ class FloatingPanel: NSPanel {
         resizeEdge = detectResizeEdge(at: mouseLocation)
         
         if resizeEdge != .none {
+            // 模式 A：调整大小
             isResizing = true
+            isDragging = false
             initialMouseLocation = mouseLocation
             initialFrame = self.frame
         } else {
-            super.mouseDown(with: event)
+            // 模式 B：移动窗口
+            isResizing = false
+            isDragging = true
+            initialMouseLocation = mouseLocation
+            initialWindowOrigin = self.frame.origin
+            NSCursor.closedHand.set() // 设置抓手光标
         }
     }
     
     override func mouseDragged(with event: NSEvent) {
+        let mouseLocation = NSEvent.mouseLocation
+        
         if isResizing {
-            let mouseLocation = NSEvent.mouseLocation
+            // --- 调整大小逻辑 ---
             let deltaX = mouseLocation.x - initialMouseLocation.x
             let deltaY = mouseLocation.y - initialMouseLocation.y
             
             var newFrame = initialFrame
             
+            // 根据边缘调整 frame
             switch resizeEdge {
             case .right:
                 newFrame.size.width = max(minSize.width, initialFrame.width + deltaX)
@@ -137,9 +156,9 @@ class FloatingPanel: NSPanel {
                 newFrame.size.height = max(minSize.height, initialFrame.height + deltaY)
             case .topLeft:
                 let newWidth = max(minSize.width, initialFrame.width - deltaX)
+                newFrame.size.height = max(minSize.height, initialFrame.height + deltaY)
                 newFrame.origin.x = initialFrame.maxX - newWidth
                 newFrame.size.width = newWidth
-                newFrame.size.height = max(minSize.height, initialFrame.height + deltaY)
             case .bottomRight:
                 newFrame.size.width = max(minSize.width, initialFrame.width + deltaX)
                 let newHeight = max(minSize.height, initialFrame.height - deltaY)
@@ -147,10 +166,10 @@ class FloatingPanel: NSPanel {
                 newFrame.size.height = newHeight
             case .bottomLeft:
                 let newWidth = max(minSize.width, initialFrame.width - deltaX)
-                newFrame.origin.x = initialFrame.maxX - newWidth
-                newFrame.size.width = newWidth
                 let newHeight = max(minSize.height, initialFrame.height - deltaY)
+                newFrame.origin.x = initialFrame.maxX - newWidth
                 newFrame.origin.y = initialFrame.maxY - newHeight
+                newFrame.size.width = newWidth
                 newFrame.size.height = newHeight
             case .none:
                 break
@@ -162,36 +181,16 @@ class FloatingPanel: NSPanel {
             
             // 处理正方形约束 (Proportional Resizing)
             if Config.shared.theme.isSquare {
-                // 取最大边长作为正方形边长
-                // 或者根据拖动方向决定：
-                // 简单的策略：均取最大值，或者根据主拖动轴
-                
                 var sideLength = max(newFrame.width, newFrame.height)
-                
-                // 再次检查约束
                 sideLength = max(sideLength, minSize.width)
                 sideLength = min(sideLength, maxSize.height)
                 
-                // 调整 Frame
-                // 如果是左边或上边拖动，需要修正 origin
+                // 修正 Origin (如果是左侧或底部调整)
                 if resizeEdge == .left || resizeEdge == .topLeft || resizeEdge == .bottomLeft {
-                     // 修正 x: 保持右边缘不变 -> newX = right - newWidth
-                     let right = newFrame.maxX
-                     newFrame.origin.x = right - sideLength
+                     newFrame.origin.x = newFrame.maxX - sideLength
                 }
-                
-                if resizeEdge == .top || resizeEdge == .topLeft || resizeEdge == .topRight {
-                    // 修正 y: 由于 Cocoa 坐标系 bottom-left 0,0，top 变化通常改变 height
-                    // 但 window frame y 是底部位置。
-                    // 拖动 top 改变 height，bottom (y) 不变。
-                    // 所以不需要修正 y?
-                    // 等等，如果拖动 Top，height 变大，y 不变，top 变高。Correct.
-                }
-                
                 if resizeEdge == .bottom || resizeEdge == .bottomLeft || resizeEdge == .bottomRight {
-                     // 拖动 Bottom，height 变大，y 需要减小 (向下延伸) -> newY = top - newHeight
-                     let top = newFrame.maxY
-                     newFrame.origin.y = top - sideLength
+                     newFrame.origin.y = newFrame.maxY - sideLength
                 }
                 
                 newFrame.size.width = sideLength
@@ -200,22 +199,32 @@ class FloatingPanel: NSPanel {
             
             self.setFrame(newFrame, display: true)
             
-            // 更新 Config 中的窗口尺寸
+            // 更新 Config
             Config.shared.windowWidth = newFrame.width
             Config.shared.windowHeight = newFrame.height
-        } else {
-            super.mouseDragged(with: event)
+            
+        } else if isDragging {
+            // --- 移动窗口逻辑 ---
+            let deltaX = mouseLocation.x - initialMouseLocation.x
+            let deltaY = mouseLocation.y - initialMouseLocation.y
+            
+            let newOrigin = NSPoint(
+                x: initialWindowOrigin.x + deltaX,
+                y: initialWindowOrigin.y + deltaY
+            )
+            self.setFrameOrigin(newOrigin)
         }
     }
     
     override func mouseUp(with event: NSEvent) {
-        if isResizing {
-            isResizing = false
-            resizeEdge = .none
-            NSCursor.arrow.set()
-        } else {
-            super.mouseUp(with: event)
-        }
+        isResizing = false
+        isDragging = false
+        resizeEdge = .none
+        
+        // 恢复光标检测
+        let mouseLocation = NSEvent.mouseLocation
+        let edge = detectResizeEdge(at: mouseLocation)
+        setCursor(for: edge)
     }
     
     override func mouseExited(with event: NSEvent) {
