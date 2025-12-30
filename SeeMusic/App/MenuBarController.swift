@@ -61,19 +61,38 @@ class MenuBarController {
         
         // 主题子菜单
         let themeMenu = NSMenu()
-        for theme in Config.Theme.allCases {
-            let item = NSMenuItem(
-                title: theme.rawValue,
-                action: #selector(setTheme(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self
-            item.representedObject = theme
-            if Config.shared.theme == theme {
-                item.state = .on
-            }
-            themeMenu.addItem(item)
-        }
+        
+        // 1. 海浪主题组
+        let waveMenu = NSMenu()
+        // 蓝白 (Classic)
+        addItem(to: waveMenu, title: "蓝白", theme: .classic)
+        // 简约 (Minimal)
+        addItem(to: waveMenu, title: "简约", theme: .minimal)
+        // 霓虹 (Neon)
+        addItem(to: waveMenu, title: "霓虹", theme: .neon)
+        
+        let waveItem = NSMenuItem(title: "海浪", action: nil, keyEquivalent: "")
+        waveItem.submenu = waveMenu
+        themeMenu.addItem(waveItem)
+        
+        // 2. 脉冲主题组
+        let pulseMenu = NSMenu()
+        // 绿色 (Particle)
+        addItem(to: pulseMenu, title: "绿色", theme: .particle)
+        
+        let pulseItem = NSMenuItem(title: "脉冲", action: nil, keyEquivalent: "")
+        pulseItem.submenu = pulseMenu
+        themeMenu.addItem(pulseItem)
+        
+        // 3. 音响主题组
+        let equalizerMenu = NSMenu()
+        // 绿色 (Equalizer)
+        addItem(to: equalizerMenu, title: "绿色", theme: .equalizer)
+        
+        let equalizerItem = NSMenuItem(title: "音响", action: nil, keyEquivalent: "")
+        equalizerItem.submenu = equalizerMenu
+        themeMenu.addItem(equalizerItem)
+        
         let themeItem = NSMenuItem(title: "主题", action: nil, keyEquivalent: "")
         themeItem.submenu = themeMenu
         menu.addItem(themeItem)
@@ -119,6 +138,21 @@ class MenuBarController {
         menu.addItem(quitItem)
         
         statusItem?.menu = menu
+    }
+    
+    // 助手方法：添加主题项
+    private func addItem(to menu: NSMenu, title: String, theme: Config.Theme) {
+        let item = NSMenuItem(
+            title: title,
+            action: #selector(setTheme(_:)),
+            keyEquivalent: ""
+        )
+        item.target = self
+        item.representedObject = theme
+        if Config.shared.theme == theme {
+            item.state = .on
+        }
+        menu.addItem(item)
     }
     
     @objc private func toggleWindow() {
