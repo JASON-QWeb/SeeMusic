@@ -169,12 +169,15 @@ struct ParticlePulseView: View {
     private func startAnimation() {
         timer?.invalidate()
         let fps = config.frameRateMode.fps
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / fps, repeats: true) { _ in
+        let newTimer = Timer(timeInterval: 1.0 / fps, repeats: true) { _ in
             Task { @MainActor in
-                time += 1.0 / fps
-                updateFeatures()
+                self.time += 1.0 / fps
+                self.updateFeatures()
             }
         }
+        // 添加到 common mode，确保菜单栏操作时也能运行
+        RunLoop.current.add(newTimer, forMode: .common)
+        timer = newTimer
     }
     
     // 更新音频特征

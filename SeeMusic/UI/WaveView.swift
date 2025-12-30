@@ -74,7 +74,7 @@ struct WaveView: View {
     // 启动动画
     private func startAnimation() {
         let fps = config.frameRateMode.fps
-        Timer.scheduledTimer(withTimeInterval: 1.0 / fps, repeats: true) { _ in
+        let newTimer = Timer(timeInterval: 1.0 / fps, repeats: true) { [self] _ in
             Task { @MainActor in
                 let dt = 1.0 / fps
                 time += dt
@@ -112,6 +112,8 @@ struct WaveView: View {
                 isClimax = targetIsClimax
             }
         }
+        // 添加到 common mode，确保菜单栏操作时也能运行
+        RunLoop.current.add(newTimer, forMode: .common)
     }
     
     // 绘制多层波浪
