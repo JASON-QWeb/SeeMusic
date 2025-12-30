@@ -90,9 +90,9 @@ class FloatingPanel: NSPanel {
         case .top, .bottom:
             NSCursor.resizeUpDown.set()
         case .topLeft, .bottomRight:
-            NSCursor._windowResizeNorthWestSouthEastCursor.set()
+            NSCursor.crosshair.set()
         case .topRight, .bottomLeft:
-            NSCursor._windowResizeNorthEastSouthWestCursor.set()
+            NSCursor.crosshair.set()
         case .none:
             NSCursor.arrow.set()
         }
