@@ -1,7 +1,9 @@
 import Foundation
 import AppKit
+import ScriptingBridge
 
-// Now Playing 服务 - 获取系统当前播放的曲目信息
+// Now Playing 服务 - 使用 Scripting Bridge 获取播放信息（仅支持 Apple Music）
+// 注意：这是公开 API，安全且符合 App Store 要求
 @MainActor
 class NowPlayingService: ObservableObject {
     static let shared = NowPlayingService()
@@ -10,7 +12,7 @@ class NowPlayingService: ObservableObject {
     @Published var isAvailable = false
     
     private var pollingTimer: Timer?
-    private let pollingInterval: TimeInterval = 1.0  // 1秒轮询
+    private let pollingInterval: TimeInterval = 2.0  // 2秒轮询
     
     private init() {}
     
@@ -19,6 +21,7 @@ class NowPlayingService: ObservableObject {
         stopPolling()
         
         // 立即获取一次
+        print("[NowPlaying] 🎵 开始轮询...")
         fetchNowPlaying()
         
         // 设置轮询定时器
@@ -37,53 +40,233 @@ class NowPlayingService: ObservableObject {
     
     // 获取当前播放信息
     private func fetchNowPlaying() {
-        // 使用 MediaRemote 私有框架获取 Now Playing 信息
-        // 通过动态加载避免直接依赖
-        
-        guard let bundle = CFBundleCreate(kCFAllocatorDefault, 
-            NSURL(fileURLWithPath: "/System/Library/PrivateFrameworks/MediaRemote.framework")) else {
-            isAvailable = false
+        // 尝试从 Apple Music 获取
+        print("[NowPlaying] 检查 Apple Music...")
+        if let info = fetchFromAppleMusic() {
+            print("[NowPlaying] ✅ Apple Music: \(info.title ?? "无标题") - \(info.artist ?? "无艺术家")")
+            trackInfo = info
+            isAvailable = info.hasInfo
             return
         }
         
-        // 获取 MRMediaRemoteGetNowPlayingInfo 函数
-        guard let getInfoPointer = CFBundleGetFunctionPointerForName(bundle, "MRMediaRemoteGetNowPlayingInfo" as CFString) else {
-            isAvailable = false
+        // 尝试从 Spotify 获取
+        print("[NowPlaying] 检查 Spotify...")
+        if let info = fetchFromSpotify() {
+            print("[NowPlaying] ✅ Spotify: \(info.title ?? "无标题") - \(info.artist ?? "无艺术家")")
+            trackInfo = info
+            isAvailable = info.hasInfo
             return
         }
         
-        typealias MRMediaRemoteGetNowPlayingInfoFunction = @convention(c) (
-            DispatchQueue,
-            @escaping ([String: Any]?) -> Void
-        ) -> Void
+        // 尝试从 QQ音乐 获取
+        print("[NowPlaying] 检查 QQ音乐...")
+        if let info = fetchFromQQMusic() {
+            print("[NowPlaying] ✅ QQ音乐: \(info.title ?? "无标题") - \(info.artist ?? "无艺术家")")
+            trackInfo = info
+            isAvailable = info.hasInfo
+            return
+        }
         
-        let getInfo = unsafeBitCast(getInfoPointer, to: MRMediaRemoteGetNowPlayingInfoFunction.self)
+        // 尝试从 网易云音乐 获取
+        print("[NowPlaying] 检查 网易云音乐...")
+        if let info = fetchFromNetEaseMusic() {
+            print("[NowPlaying] ✅ 网易云: \(info.title ?? "无标题") - \(info.artist ?? "无艺术家")")
+            trackInfo = info
+            isAvailable = info.hasInfo
+            return
+        }
         
-        getInfo(DispatchQueue.main) { [weak self] info in
-            Task { @MainActor in
-                guard let self = self else { return }
+        // 没有播放信息
+        print("[NowPlaying] ❌ 未检测到任何播放器")
+        trackInfo = nil
+        isAvailable = false
+    }
+    
+    // 从 Apple Music 获取（使用 AppleScript）
+    private func fetchFromAppleMusic() -> TrackInfo? {
+        // 检查 Music 应用是否在运行
+        let runningApps = NSWorkspace.shared.runningApplications
+        let musicApp = runningApps.first { $0.bundleIdentifier == "com.apple.Music" }
+        
+        guard let app = musicApp else {
+            print("[NowPlaying]   → Apple Music 未运行")
+            return nil
+        }
+        print("[NowPlaying]   → Apple Music 正在运行: \(app.localizedName ?? "unknown")")
+        
+        let script = """
+        tell application "Music"
+            if player state is playing then
+                set trackName to name of current track
+                set artistName to artist of current track
+                return trackName & "|||" & artistName
+            else
+                return ""
+            end if
+        end tell
+        """
+        
+        return executeAppleScript(script)
+    }
+    
+    // 从 Spotify 获取（使用 AppleScript）
+    private func fetchFromSpotify() -> TrackInfo? {
+        let runningApps = NSWorkspace.shared.runningApplications
+        let spotifyApp = runningApps.first { $0.bundleIdentifier == "com.spotify.client" }
+        
+        guard let app = spotifyApp else {
+            print("[NowPlaying]   → Spotify 未运行")
+            return nil
+        }
+        print("[NowPlaying]   → Spotify 正在运行: \(app.localizedName ?? "unknown")")
+        
+        let script = """
+        tell application "Spotify"
+            if player state is playing then
+                set trackName to name of current track
+                set artistName to artist of current track
+                return trackName & "|||" & artistName
+            else
+                return ""
+            end if
+        end tell
+        """
+        
+        return executeAppleScript(script)
+    }
+    
+    // 执行 AppleScript 并解析结果
+    private func executeAppleScript(_ source: String) -> TrackInfo? {
+        var error: NSDictionary?
+        guard let script = NSAppleScript(source: source) else { return nil }
+        
+        let result = script.executeAndReturnError(&error)
+        
+        if let err = error {
+            print("[NowPlaying]   → AppleScript 错误: \(err)")
+            return nil
+        }
+        
+        guard let resultString = result.stringValue, !resultString.isEmpty else {
+            return nil
+        }
+        
+        let parts = resultString.components(separatedBy: "|||")
+        guard parts.count >= 2 else { return nil }
+        
+        let title = parts[0].isEmpty ? nil : parts[0]
+        let artist = parts[1].isEmpty ? nil : parts[1]
+        
+        return TrackInfo(
+            title: title,
+            artist: artist,
+            artworkData: nil,
+            isPlaying: true
+        )
+    }
+    
+    // 从 QQ音乐 获取（通过窗口标题）
+    // QQ音乐窗口标题格式通常为: "歌曲名 - 歌手名"
+    private func fetchFromQQMusic() -> TrackInfo? {
+        let bundleId = "com.tencent.QQMusicMac"
+        return fetchFromWindowTitle(bundleId: bundleId, separator: " - ")
+    }
+    
+    // 从 网易云音乐 获取（通过窗口标题）
+    // 网易云音乐窗口标题格式通常为: "歌曲名 - 歌手名"
+    private func fetchFromNetEaseMusic() -> TrackInfo? {
+        let bundleId = "com.netease.163music"
+        return fetchFromWindowTitle(bundleId: bundleId, separator: " - ")
+    }
+    
+    // 通过窗口标题获取歌曲信息（适用于不支持 AppleScript 的应用）
+    private func fetchFromWindowTitle(bundleId: String, separator: String) -> TrackInfo? {
+        // 检查应用是否在运行
+        let runningApps = NSWorkspace.shared.runningApplications
+        guard let app = runningApps.first(where: { $0.bundleIdentifier == bundleId }) else {
+            print("[NowPlaying]   → \(bundleId) 未运行")
+            return nil
+        }
+        print("[NowPlaying]   → \(app.localizedName ?? bundleId) 正在运行")
+        
+        // 通过 Accessibility API 获取窗口标题
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        
+        var windowsRef: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef)
+        
+        guard result == .success else {
+            print("[NowPlaying]   → 辅助功能权限错误: \(result.rawValue)，请在系统设置中授权")
+            return nil
+        }
+        
+        guard let windows = windowsRef as? [AXUIElement], !windows.isEmpty else {
+            print("[NowPlaying]   → 无法获取窗口列表")
+            return nil
+        }
+        print("[NowPlaying]   → 找到 \(windows.count) 个窗口")
+        
+        // 尝试从所有窗口获取标题
+        var foundTitle: String?
+        for (index, window) in windows.enumerated() {
+            var titleRef: CFTypeRef?
+            let titleResult = AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleRef)
+            
+            if titleResult == .success, let title = titleRef as? String, !title.isEmpty {
+                print("[NowPlaying]   → 窗口\(index) 标题: \(title)")
+                foundTitle = title
+                break
+            } else {
+                // 尝试获取其他属性
+                var roleRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(window, kAXRoleAttribute as CFString, &roleRef)
+                let role = roleRef as? String ?? "unknown"
                 
-                guard let info = info, !info.isEmpty else {
-                    self.trackInfo = nil
-                    self.isAvailable = false
-                    return
-                }
+                var subRoleRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subRoleRef)
+                let subRole = subRoleRef as? String ?? "none"
                 
-                // 提取信息
-                let title = info["kMRMediaRemoteNowPlayingInfoTitle"] as? String
-                let artist = info["kMRMediaRemoteNowPlayingInfoArtist"] as? String
-                let artworkData = info["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data
-                let playbackRate = info["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double
-                
-                self.trackInfo = TrackInfo(
-                    title: title,
-                    artist: artist,
-                    artworkData: artworkData,
-                    isPlaying: playbackRate.map { $0 > 0 }
-                )
-                
-                self.isAvailable = title != nil || artist != nil
+                print("[NowPlaying]   → 窗口\(index) 无标题 (role: \(role), subrole: \(subRole))")
             }
         }
+        
+        guard let title = foundTitle else {
+            print("[NowPlaying]   → 所有窗口都没有有效标题")
+            return nil
+        }
+        
+        // 解析标题（格式: "歌曲名 - 歌手名" 或只有应用名）
+        // 排除只包含应用名的情况
+        let appName = app.localizedName ?? ""
+        if title == appName || title == "QQ音乐" || title == "网易云音乐" || title == "NeteaseMusic" {
+            print("[NowPlaying]   → 标题只是应用名，跳过")
+            return nil
+        }
+        
+        // 尝试解析 "歌曲名 - 歌手名" 格式
+        if title.contains(separator) {
+            let parts = title.components(separatedBy: separator)
+            if parts.count >= 2 {
+                let songTitle = parts[0].trimmingCharacters(in: .whitespaces)
+                let artist = parts[1].trimmingCharacters(in: .whitespaces)
+                
+                if !songTitle.isEmpty {
+                    return TrackInfo(
+                        title: songTitle,
+                        artist: artist.isEmpty ? nil : artist,
+                        artworkData: nil,
+                        isPlaying: true
+                    )
+                }
+            }
+        }
+        
+        // 如果格式不匹配，整个标题作为歌曲名
+        return TrackInfo(
+            title: title,
+            artist: nil,
+            artworkData: nil,
+            isPlaying: true
+        )
     }
 }

@@ -9,15 +9,15 @@ struct ContentView: View {
             // 波浪视图（透明背景）
             WaveView()
             
-            // 曲目信息（悬浮在上方）
-            VStack {
-                if config.showTrackInfo {
-                    TrackInfoView()
-                        .padding(.horizontal, 8)
-                        .padding(.top, 8)
-                }
-                Spacer()
-            }
+            // TODO: 曲目信息功能暂时禁用，等待权限方案解决后恢复
+            // VStack {
+            //     if config.showTrackInfo {
+            //         TrackInfoView()
+            //             .padding(.horizontal, 8)
+            //             .padding(.top, 8)
+            //     }
+            //     Spacer()
+            // }
         }
         .frame(
             width: config.windowWidth,
