@@ -73,9 +73,30 @@ class Config: ObservableObject {
     
     // MARK: - 枚举定义
     enum Theme: String, CaseIterable {
-        case classic = "经典"
+        case classic = "蓝白"
         case minimal = "简约"
         case neon = "霓虹"
+        case equalizer = "音响"
+        case particle = "脉冲"
+        
+        // 是否是正方形主题
+        var isSquare: Bool {
+            switch self {
+            case .equalizer, .particle:
+                return true
+            default:
+                return false
+            }
+        }
+        
+        // 推荐的窗口尺寸
+        var recommendedSize: (width: CGFloat, height: CGFloat) {
+            if isSquare {
+                return (200, 200)
+            } else {
+                return (480, 140)
+            }
+        }
     }
     
     enum FrameRateMode: String, CaseIterable {

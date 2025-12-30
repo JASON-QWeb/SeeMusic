@@ -63,35 +63,12 @@ struct WaveView: View {
         }
         .onAppear {
             startAnimation()
-            startAudioCapture()
-        }
-        .onDisappear {
-            stopAudioCapture()
         }
     }
     
     // 隐藏窗口
     private func hideWindow() {
         NSApp.windows.first { $0 is FloatingPanel }?.orderOut(nil)
-    }
-    
-    // 启动音频捕获
-    private func startAudioCapture() {
-        print("[SeeMusic] 🚀 WaveView 启动音频捕获...")
-        Task {
-            await audioService.start()
-            print("[SeeMusic] 🎧 音频服务已启动: isCapturing=\(audioService.isCapturing)")
-            if !audioService.isCapturing {
-                print("[SeeMusic] ⚠️ 音频未启动，将使用静态波浪")
-            }
-        }
-    }
-    
-    // 停止音频捕获
-    private func stopAudioCapture() {
-        Task {
-            await audioService.stop()
-        }
     }
     
     // 启动动画
@@ -281,6 +258,11 @@ struct WaveView: View {
                 (Color(red: 0.2, green: 0.8, blue: 1.0), 0.012, 0.9, 0.85, 0.8),
                 (Color(red: 0.8, green: 0.2, blue: 1.0), 0.018, 1.4, 0.7, 0.6),
                 (Color(red: 0.2, green: 1.0, blue: 0.6), 0.008, 0.6, 0.5, 0.4),
+            ]
+        case .equalizer, .particle:
+            // 这些主题不使用 WaveView，返回默认值
+            return [
+                (Color.clear, 0.015, 1.0, 1.0, 0.0),
             ]
         }
     }

@@ -184,10 +184,8 @@ class NowPlayingService: ObservableObject {
         // 检查应用是否在运行
         let runningApps = NSWorkspace.shared.runningApplications
         guard let app = runningApps.first(where: { $0.bundleIdentifier == bundleId }) else {
-            print("[NowPlaying]   → \(bundleId) 未运行")
             return nil
         }
-        print("[NowPlaying]   → \(app.localizedName ?? bundleId) 正在运行")
         
         // 通过 Accessibility API 获取窗口标题
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
@@ -195,51 +193,22 @@ class NowPlayingService: ObservableObject {
         var windowsRef: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef)
         
-        guard result == .success else {
-            print("[NowPlaying]   → 辅助功能权限错误: \(result.rawValue)，请在系统设置中授权")
+        guard result == .success, let windows = windowsRef as? [AXUIElement], !windows.isEmpty else {
             return nil
         }
         
-        guard let windows = windowsRef as? [AXUIElement], !windows.isEmpty else {
-            print("[NowPlaying]   → 无法获取窗口列表")
-            return nil
-        }
-        print("[NowPlaying]   → 找到 \(windows.count) 个窗口")
+        // 获取第一个窗口的标题
+        var titleRef: CFTypeRef?
+        let titleResult = AXUIElementCopyAttributeValue(windows[0], kAXTitleAttribute as CFString, &titleRef)
         
-        // 尝试从所有窗口获取标题
-        var foundTitle: String?
-        for (index, window) in windows.enumerated() {
-            var titleRef: CFTypeRef?
-            let titleResult = AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleRef)
-            
-            if titleResult == .success, let title = titleRef as? String, !title.isEmpty {
-                print("[NowPlaying]   → 窗口\(index) 标题: \(title)")
-                foundTitle = title
-                break
-            } else {
-                // 尝试获取其他属性
-                var roleRef: CFTypeRef?
-                AXUIElementCopyAttributeValue(window, kAXRoleAttribute as CFString, &roleRef)
-                let role = roleRef as? String ?? "unknown"
-                
-                var subRoleRef: CFTypeRef?
-                AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subRoleRef)
-                let subRole = subRoleRef as? String ?? "none"
-                
-                print("[NowPlaying]   → 窗口\(index) 无标题 (role: \(role), subrole: \(subRole))")
-            }
-        }
-        
-        guard let title = foundTitle else {
-            print("[NowPlaying]   → 所有窗口都没有有效标题")
+        guard titleResult == .success, let title = titleRef as? String, !title.isEmpty else {
             return nil
         }
         
         // 解析标题（格式: "歌曲名 - 歌手名" 或只有应用名）
         // 排除只包含应用名的情况
         let appName = app.localizedName ?? ""
-        if title == appName || title == "QQ音乐" || title == "网易云音乐" || title == "NeteaseMusic" {
-            print("[NowPlaying]   → 标题只是应用名，跳过")
+        if title == appName || title == "QQ音乐" || title == "网易云音乐" {
             return nil
         }
         

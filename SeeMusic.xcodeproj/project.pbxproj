@@ -7,21 +7,23 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		001 /* SeeMusicApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101; };
-		002 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102; };
-		003 /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 103; };
-		004 /* WaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104; };
-		005 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105; };
-		006 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106; };
-		007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 107; };
-		008 /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109; };
-		009 /* FeatureExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110; };
-		010 /* Smoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111; };
-		015 /* FeaturePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116; };
-		011 /* NowPlayingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112; };
-		012 /* TrackInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113; };
-		013 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114; };
-		014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115; };
+		001 /* SeeMusicApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101 /* SeeMusicApp.swift */; };
+		002 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102 /* MenuBarController.swift */; };
+		003 /* FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 103 /* FloatingPanel.swift */; };
+		004 /* WaveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104 /* WaveView.swift */; };
+		005 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105 /* Models.swift */; };
+		006 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106 /* Config.swift */; };
+		007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 107 /* Assets.xcassets */; };
+		008 /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109 /* AudioCaptureService.swift */; };
+		009 /* FeatureExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110 /* FeatureExtractor.swift */; };
+		010 /* Smoother.swift in Sources */ = {isa = PBXBuildFile; fileRef = 111 /* Smoother.swift */; };
+		011 /* NowPlayingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112 /* NowPlayingService.swift */; };
+		012 /* TrackInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 113 /* TrackInfoView.swift */; };
+		013 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114 /* ContentView.swift */; };
+		014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115 /* SettingsView.swift */; };
+		015 /* FeaturePipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116 /* FeaturePipeline.swift */; };
+		9ED6151E2F03D9B700125562 /* EqualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED6151C2F03D9B700125562 /* EqualizerView.swift */; };
+		9ED6151F2F03D9B700125562 /* ParticlePulseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED6151D2F03D9B700125562 /* ParticlePulseView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,11 +39,13 @@
 		109 /* AudioCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureService.swift; sourceTree = "<group>"; };
 		110 /* FeatureExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureExtractor.swift; sourceTree = "<group>"; };
 		111 /* Smoother.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Smoother.swift; sourceTree = "<group>"; };
-		116 /* FeaturePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeaturePipeline.swift; sourceTree = "<group>"; };
 		112 /* NowPlayingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingService.swift; sourceTree = "<group>"; };
 		113 /* TrackInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackInfoView.swift; sourceTree = "<group>"; };
 		114 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		115 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		116 /* FeaturePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeaturePipeline.swift; sourceTree = "<group>"; };
+		9ED6151C2F03D9B700125562 /* EqualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EqualizerView.swift; sourceTree = "<group>"; };
+		9ED6151D2F03D9B700125562 /* ParticlePulseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticlePulseView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +101,8 @@
 		304 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				9ED6151C2F03D9B700125562 /* EqualizerView.swift */,
+				9ED6151D2F03D9B700125562 /* ParticlePulseView.swift */,
 				103 /* FloatingPanel.swift */,
 				104 /* WaveView.swift */,
 				113 /* TrackInfoView.swift */,
@@ -139,7 +145,7 @@
 /* Begin PBXNativeTarget section */
 		400 /* SeeMusic */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 501;
+			buildConfigurationList = 501 /* Build configuration list for PBXNativeTarget "SeeMusic" */;
 			buildPhases = (
 				401 /* Sources */,
 				200 /* Frameworks */,
@@ -169,7 +175,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 502;
+			buildConfigurationList = 502 /* Build configuration list for PBXProject "SeeMusic" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -205,6 +211,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				001 /* SeeMusicApp.swift in Sources */,
+				9ED6151E2F03D9B700125562 /* EqualizerView.swift in Sources */,
+				9ED6151F2F03D9B700125562 /* ParticlePulseView.swift in Sources */,
 				002 /* MenuBarController.swift in Sources */,
 				003 /* FloatingPanel.swift in Sources */,
 				004 /* WaveView.swift in Sources */,
