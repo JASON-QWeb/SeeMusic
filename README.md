@@ -36,7 +36,7 @@
    ```bash
    open SeeMusic.xcodeproj
    ```
-3. 选择 `SeeMusic` scheme，点击 ▶️ 运行
+3. 点击 Run（⌘R）启动。
 4. 首次运行会请求屏幕录制权限，授权后重启应用
 
 ---
