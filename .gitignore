@@ -1,0 +1,75 @@
+# Xcode
+#
+# gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
+
+## User settings
+xcuserdata/
+
+## Xcode build generated
+build/
+DerivedData/
+
+## File system metadata
+.DS_Store
+*.xcuserstate
+
+## Obj-C/Swift specific
+*.hmap
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+## Swift Package Manager
+.build/
+Packages/
+Package.resolved
+
+## CocoaPods
+Pods/
+*.xcworkspace
+!*.xcodeproj
+
+## Carthage
+Carthage/Build/
+Carthage/Checkouts/
+
+## SPM & Xcode
+.swiftpm/
+xcshareddata/
+
+## Code Injection
+iOSInjectionProject/
+
+## macOS specific
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+## Archive
+*.xcarchive
+
+## Crashlytics
+crashlytics.settings
+crashlytics-build.properties
+fabric.properties
+
+## IDEs
+.idea/
+*.swp
+*~
+
+## Environment files
+.env
+.env.local
