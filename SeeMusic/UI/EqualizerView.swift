@@ -37,28 +37,35 @@ struct EqualizerView: View {
             let blockHeight = (size - totalSpacingV) / CGFloat(blockCount)
             
             ZStack {
-                // 柱状图主体
-                HStack(alignment: .bottom, spacing: columnSpacing) {
-                    ForEach(0..<columnCount, id: \.self) { displayIndex in
-                        // 使用映射获取逻辑索引
+                // 使用 Canvas 高效绘制柱状图
+                Canvas { context, canvasSize in
+                    let padding: CGFloat = 10
+                    let availableWidth = canvasSize.width - padding * 2
+                    let availableHeight = canvasSize.height - padding * 2
+                    
+                    let totalColumnSpacing = CGFloat(columnCount - 1) * columnSpacing
+                    let totalBlockSpacing = CGFloat(blockCount - 1) * blockSpacing
+                    
+                    let colWidth = (availableWidth - totalColumnSpacing) / CGFloat(columnCount)
+                    let blkHeight = (availableHeight - totalBlockSpacing) / CGFloat(blockCount)
+                    
+                    for displayIndex in 0..<columnCount {
                         let logicIndex = columnMapping[displayIndex]
+                        let colX = padding + CGFloat(displayIndex) * (colWidth + columnSpacing)
                         
-                        VStack(spacing: blockSpacing) {
-                            // 从上到下渲染方块
-                            ForEach(0..<blockCount, id: \.self) { reverseIndex in
-                                let blockIndex = blockCount - 1 - reverseIndex
-                                let isActive = shouldActivate(column: logicIndex, block: blockIndex)
-                                
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(blockColor(blockIndex: blockIndex, isActive: isActive))
-                                    .frame(width: columnWidth, height: blockHeight)
-                                    // 激活时添加微弱辉光
-                                    .shadow(color: isActive ? blockColor(blockIndex: blockIndex, isActive: true).opacity(0.5) : .clear, radius: 2)
-                            }
+                        for blockIdx in 0..<blockCount {
+                            let isActive = shouldActivate(column: logicIndex, block: blockIdx)
+                            let color = blockColorForCanvas(blockIndex: blockIdx, isActive: isActive)
+                            
+                            // 从底部向上绘制 (blockIdx 0 在底部)
+                            let blkY = padding + CGFloat(blockCount - 1 - blockIdx) * (blkHeight + blockSpacing)
+                            
+                            let rect = CGRect(x: colX, y: blkY, width: colWidth, height: blkHeight)
+                            let path = RoundedRectangle(cornerRadius: 2).path(in: rect)
+                            context.fill(path, with: .color(color))
                         }
                     }
                 }
-                .padding(10)
                 .opacity(isHovering ? 0.3 : 1.0)
                 
                 // Hover 时显示隐藏按钮
@@ -164,6 +171,32 @@ struct EqualizerView: View {
                     saturation: saturation,
                     brightness: brightness)
                 .opacity(opacity)
+    }
+    
+    // Canvas 专用颜色计算
+    private func blockColorForCanvas(blockIndex: Int, isActive: Bool) -> Color {
+        let normalized = CGFloat(blockIndex) / CGFloat(blockCount - 1)
+        
+        if !isActive {
+            let inactiveOpacity = 0.6 - normalized * 0.5
+            return Color.black.opacity(inactiveOpacity)
+        }
+        
+        var baseHue: Double
+        if blockIndex >= 9 {
+            baseHue = 0.0
+        } else if blockIndex >= 5 {
+            baseHue = 0.14
+        } else {
+            baseHue = 0.35
+        }
+        
+        let globalFactor = normalized
+        let saturation = 0.95 - globalFactor * 0.35
+        let brightness = 0.8 + globalFactor * 0.2
+        let opacity = 1.0 - globalFactor * 0.3
+        
+        return Color(hue: baseHue, saturation: saturation, brightness: brightness).opacity(opacity)
     }
     
     // 启动动画

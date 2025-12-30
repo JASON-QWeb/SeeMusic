@@ -14,12 +14,16 @@ class FeatureExtractor {
     private var window: [Float]
     private var splitComplex: DSPSplitComplex
     
+    // 预分配的样本缓冲区，避免每帧重新分配
+    private var samples: [Float]
+    
     init() {
         log2n = vDSP_Length(log2(Float(fftLength)))
         fftSetup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))
         
         realBuffer = [Float](repeating: 0, count: fftLength / 2)
         imagBuffer = [Float](repeating: 0, count: fftLength / 2)
+        samples = [Float](repeating: 0, count: fftLength)
         
         // 创建 Hanning 窗
         window = [Float](repeating: 0, count: fftLength)
@@ -69,8 +73,11 @@ class FeatureExtractor {
         
         guard sampleCount > 0 else { return .zero }
         
-        // 转换为 Float 数组
-        var samples = [Float](repeating: 0, count: min(sampleCount, fftLength))
+        // 重用预分配的样本缓冲区
+        let usedCount = min(sampleCount, fftLength)
+        samples.withUnsafeMutableBufferPointer { ptr in
+            for i in 0..<usedCount { ptr[i] = 0 }
+        }
         
         if bytesPerSample == 4 { // Float32
             let floatData = UnsafeRawPointer(data).assumingMemoryBound(to: Float.self)

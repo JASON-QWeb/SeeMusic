@@ -18,6 +18,9 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
     private let featurePipeline = FeaturePipeline()
     private var isStarting = false
     
+    // 专用后台队列用于音频处理，避免阻塞主线程
+    private let processingQueue = DispatchQueue(label: "com.seemusic.processing", qos: .userInitiated)
+    
     override init() {
         super.init()
     }
@@ -68,10 +71,10 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
             // 创建流（使用 self 作为 delegate）
             let newStream = SCStream(filter: filter, configuration: config, delegate: self)
             
-            // 设置音频输出
+            // 设置音频输出 - 在后台队列处理，仅发布结果到主线程
             let output = AudioStreamOutput { [weak self] buffer in
-                Task { @MainActor in
-                    self?.processAudioBuffer(buffer)
+                self?.processingQueue.async {
+                    self?.processAudioBufferBackground(buffer)
                 }
             }
             
@@ -135,27 +138,34 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
         }
     }
     
-    // 处理音频 buffer
-    // private var logCounter = 0
-    private func processAudioBuffer(_ buffer: CMSampleBuffer) {
+    // 处理音频 buffer (在后台队列执行)
+    nonisolated private func processAudioBufferBackground(_ buffer: CMSampleBuffer) {
         let rawFeatures = featureExtractor.extractFeatures(from: buffer)
+        
+        // 获取配置参数 (Config.shared 是线程安全的)
+        let rmsGain = Float(Config.shared.rmsGain)
+        let lowGain = Float(Config.shared.lowGain)
+        let beatDiffGain = Float(Config.shared.beatBoost)
+        let rmsAttackMs = Config.shared.rmsAttackMs
+        let rmsReleaseMs = Config.shared.rmsReleaseMs
+        let lowAttackMs = Config.shared.lowAttackMs
+        let lowReleaseMs = Config.shared.lowReleaseMs
+        
         let params = FeaturePipeline.Parameters(
-            rmsGain: Float(Config.shared.rmsGain),
-            lowGain: Float(Config.shared.lowGain),
-            beatDiffGain: Float(Config.shared.beatBoost),
-            rmsAttackMs: Config.shared.rmsAttackMs,
-            rmsReleaseMs: Config.shared.rmsReleaseMs,
-            lowAttackMs: Config.shared.lowAttackMs,
-            lowReleaseMs: Config.shared.lowReleaseMs
+            rmsGain: rmsGain,
+            lowGain: lowGain,
+            beatDiffGain: beatDiffGain,
+            rmsAttackMs: rmsAttackMs,
+            rmsReleaseMs: rmsReleaseMs,
+            lowAttackMs: lowAttackMs,
+            lowReleaseMs: lowReleaseMs
         )
         let processed = featurePipeline.process(rawFeatures, parameters: params)
-        currentFeatures = processed
         
-        // logCounter += 1
-        // if logCounter >= 60 {
-        //     logCounter = 0
-        //     print("[SeeMusic] 🎵 音频: RMS=\(String(format: "%.4f", processed.rms)), Low=\(String(format: "%.4f", processed.lowEnergy))")
-        // }
+        // 仅将最终结果发布到主线程
+        Task { @MainActor [weak self] in
+            self?.currentFeatures = processed
+        }
     }
 }
 

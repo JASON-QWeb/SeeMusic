@@ -13,6 +13,7 @@ struct WaveView: View {
     @State private var smoothedBeat: CGFloat = 0.0
     @State private var smoothedClimax: CGFloat = 0.0
     @State private var isClimax: Bool = false
+    @State private var lastFrameTime: Double = 0  // 用于计算真实 deltaTime
     
     // 波浪参数
     private let baseAmplitude: CGFloat = 15
@@ -74,9 +75,12 @@ struct WaveView: View {
     // 启动动画
     private func startAnimation() {
         let fps = config.frameRateMode.fps
+        lastFrameTime = CACurrentMediaTime()
         let newTimer = Timer(timeInterval: 1.0 / fps, repeats: true) { [self] _ in
             Task { @MainActor in
-                let dt = 1.0 / fps
+                let now = CACurrentMediaTime()
+                let dt = lastFrameTime == 0 ? (1.0 / fps) : (now - lastFrameTime)
+                lastFrameTime = now
                 time += dt
                 
                 // 平滑过渡音频特征

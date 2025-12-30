@@ -19,10 +19,11 @@ struct ParticlePulseView: View {
     @State private var paletteTargetIndex: Int = 0
     @State private var paletteBlend: CGFloat = 0
     @State private var nextPaletteSwitch: Double = 0
+    @State private var lastFrameTime: Double = 0  // 用于计算真实 deltaTime
     
     // 粒子数据
     @State private var particles: [Particle] = []
-    private let particleCount = 220
+    private let particleCount = 120  // 降低粒子数量以提升性能
     
     private typealias PaletteStop = (h: CGFloat, s: CGFloat, b: CGFloat)
     private typealias Palette = [PaletteStop]
@@ -251,9 +252,12 @@ struct ParticlePulseView: View {
     private func startAnimation() {
         timer?.invalidate()
         let fps = config.frameRateMode.fps
-        let delta = 1.0 / fps
+        lastFrameTime = CACurrentMediaTime()
         let newTimer = Timer(timeInterval: 1.0 / fps, repeats: true) { _ in
             Task { @MainActor in
+                let now = CACurrentMediaTime()
+                let delta = self.lastFrameTime == 0 ? (1.0 / fps) : (now - self.lastFrameTime)
+                self.lastFrameTime = now
                 self.time += delta
                 self.updateFeatures()
                 self.updateRotation(delta: delta)
