@@ -1,6 +1,6 @@
 import SwiftUI
 
-// 3D 粒子脉冲圆面视图 - 绿色粒子组成的椭圆，随音量颤动
+// 粒子鼓面视图 - 大量粒子组成鼓面，随音量震动
 struct ParticlePulseView: View {
     @ObservedObject var config = Config.shared
     @ObservedObject var audioService = AudioCaptureService.shared
@@ -15,39 +15,42 @@ struct ParticlePulseView: View {
     
     // 粒子数据
     @State private var particles: [Particle] = []
-    private let particleCount = 60
+    private let particleCount = 220
     
     struct Particle: Identifiable {
         let id = UUID()
-        var baseX: CGFloat
-        var baseY: CGFloat
+        var radius: CGFloat
+        var angle: CGFloat
         var baseSize: CGFloat
-        var depth: CGFloat
         var phase: CGFloat
+        var jitter: CGFloat
     }
     
     var body: some View {
         GeometryReader { geometry in
             let size = min(geometry.size.width, geometry.size.height)
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            let radius = size * 0.38
+            let radius = size * 0.44
             
             ZStack {
                 // 粒子画布
                 Canvas { context, canvasSize in
                     for particle in particles {
-                        let (position, particleSize, opacity) = calculateParticle(
+                        let (position, particleSize, opacity, bulge) = calculateParticle(
                             particle: particle,
                             center: center,
                             radius: radius,
                             rms: smoothedRMS,
-                            beat: smoothedBeat
+                            beat: smoothedBeat,
+                            climax: smoothedClimax
                         )
                         
+                        let brightness = clamp(0.25 + smoothedRMS * 0.45 + bulge * 0.6, 0.0, 1.0)
+                        let saturation = clamp(0.55 + smoothedRMS * 0.20 + smoothedClimax * 0.10, 0.0, 1.0)
                         let particleColor = Color(
                             hue: 0.35,
-                            saturation: 0.6 + particle.depth * 0.3,
-                            brightness: 0.4 + particle.depth * 0.5 + smoothedRMS * 0.2
+                            saturation: saturation,
+                            brightness: brightness
                         )
                         
                         // 外发光
@@ -58,7 +61,7 @@ struct ParticlePulseView: View {
                                 width: particleSize * 2.4,
                                 height: particleSize * 2.4
                             )),
-                            with: .color(particleColor.opacity(opacity * 0.25))
+                            with: .color(particleColor.opacity(opacity * 0.20))
                         )
                         
                         // 核心粒子
@@ -123,18 +126,19 @@ struct ParticlePulseView: View {
     
     // 初始化粒子
     private func initializeParticles() {
+        let golden = CGFloat.pi * (3 - sqrt(5))
         particles = (0..<particleCount).map { i in
-            let angle = CGFloat.random(in: 0...(2 * .pi))
-            let r = sqrt(CGFloat.random(in: 0...1))
-            let x = 0.5 + cos(angle) * r * 0.42
-            let y = 0.5 + sin(angle) * r * 0.38
+            let t = CGFloat(i) + 0.5
+            let baseRadius = sqrt(t / CGFloat(particleCount))
+            let radiusJitter = CGFloat.random(in: -0.012...0.012)
+            let angle = t * golden
             
             return Particle(
-                baseX: x,
-                baseY: y,
-                baseSize: CGFloat.random(in: 4...9),
-                depth: CGFloat.random(in: 0.2...1),
-                phase: CGFloat.random(in: 0...(2 * .pi))
+                radius: clamp(baseRadius + radiusJitter, 0.0, 1.0),
+                angle: angle,
+                baseSize: CGFloat.random(in: 2.0...4.2),
+                phase: CGFloat.random(in: 0...(2 * .pi)),
+                jitter: CGFloat.random(in: -0.05...0.05)
             )
         }
     }
@@ -145,24 +149,38 @@ struct ParticlePulseView: View {
         center: CGPoint,
         radius: CGFloat,
         rms: CGFloat,
-        beat: CGFloat
-    ) -> (CGPoint, CGFloat, CGFloat) {
-        let pulseScale = 1.0 + rms * 0.25 + beat * 0.15
-        let tremor = sin(time * 6 + Double(particle.phase)) * 0.015 * (rms * 2 + beat)
-        let tremorX = cos(time * 5 + Double(particle.phase) * 1.3) * 0.012 * (rms * 2 + beat)
-        let depthPush = rms * particle.depth * 0.12
+        beat: CGFloat,
+        climax: CGFloat
+    ) -> (CGPoint, CGFloat, CGFloat, CGFloat) {
+        let activeRadius = 0.35 + rms * 0.55 + climax * 0.10
+        let range = max(0.0, 1.0 - particle.radius / max(0.001, activeRadius))
+        let edgeDamp = pow(1.0 - particle.radius, 0.6)
+        let envelope = range * edgeDamp
         
-        let offsetX = (particle.baseX - 0.5) * 2 * radius * pulseScale
-        let offsetY = (particle.baseY - 0.5) * 2 * radius * 0.9 * pulseScale
+        let freq = 2.8 + rms * 6.0 + beat * 8.0
+        let freqValue = Double(freq)
+        let wave = sin(time * freqValue - Double(particle.radius) * 6.0 + Double(particle.phase))
+        let harmonic = 0.4 * sin(time * (freqValue * 1.7) + Double(particle.radius) * 9.0 + Double(particle.phase) * 1.3)
         
-        let x = center.x + offsetX + tremor * radius + tremorX * radius
-        let y = center.y + offsetY + tremor * radius * 0.7
+        let ringSpeed = 0.9 + rms * 0.6
+        let ringPos = (time * Double(ringSpeed)).truncatingRemainder(dividingBy: 1.0)
+        let ringWidth = 0.10 + rms * 0.08
+        let ring = exp(-pow(Double((particle.radius - CGFloat(ringPos)) / ringWidth), 2.0))
+        let impact = beat * CGFloat(ring) * 0.14 * edgeDamp
         
-        let sizeFactor = 0.5 + particle.depth * 0.5 + depthPush
-        let size = particle.baseSize * sizeFactor * (1 + beat * 0.2)
-        let opacity = 0.35 + particle.depth * 0.6 + rms * 0.15
+        let amp = 0.03 + rms * 0.10 + beat * 0.05 + climax * 0.08
+        let z = (CGFloat(wave) + CGFloat(harmonic)) * amp * envelope + impact
+        let bulge = clamp(z, -0.18, 0.18)
         
-        return (CGPoint(x: x, y: y), size, min(1.0, opacity))
+        let angle = particle.angle + particle.jitter
+        let scale = 1.0 + bulge
+        let x = center.x + cos(angle) * particle.radius * radius * scale
+        let y = center.y + sin(angle) * particle.radius * radius * scale
+        
+        let size = particle.baseSize * (0.75 + rms * 0.35 + bulge * 1.6)
+        let opacity = clamp(0.25 + rms * 0.35 + bulge * 0.9, 0.12, 1.0)
+        
+        return (CGPoint(x: x, y: y), size, opacity, bulge)
     }
     
     // 启动动画
@@ -196,11 +214,16 @@ struct ParticlePulseView: View {
             targetClimax = 0.0
         }
         
-        let smoothFactor: CGFloat = 0.18
-        let beatFactor: CGFloat = 0.4
+        let smoothFactor: CGFloat = 0.20
+        let beatFactor: CGFloat = 0.35
+        let climaxFactor: CGFloat = 0.25
         smoothedRMS += (targetRMS - smoothedRMS) * smoothFactor
         smoothedBeat += (targetBeat - smoothedBeat) * beatFactor
-        smoothedClimax += (targetClimax - smoothedClimax) * smoothFactor
+        smoothedClimax += (targetClimax - smoothedClimax) * climaxFactor
+    }
+    
+    private func clamp(_ value: CGFloat, _ minValue: CGFloat, _ maxValue: CGFloat) -> CGFloat {
+        min(max(value, minValue), maxValue)
     }
 }
 

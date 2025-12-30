@@ -1,150 +1,86 @@
 # 音响柱状图主题 (Equalizer)
 
-## 0. 目标
+## 0. 设计目标
 
-实现类似音频均衡器的柱状图可视化效果：
-- **动态范围宽**：从1格（静音）到10格（非常响）有完整的过渡
-- **敏感律动**：小音量变化也能产生可见的跳动
-- **节奏感**：每列错开跳动，产生"波浪"效果
-- **真实感**：模拟真实音响设备的响应特性
-
----
-
-## 1. 问题分析
-
-### 当前问题
-- 静音 → 1格
-- 有声音 → 直接逼近10格
-- **原因**：RMS 值从 0 到 0.3 的跳跃映射到 10% 到 90%，中间没有过渡
-
-### 解决方案
-使用 **对数映射 + gamma 压缩**，让：
-- 小音量：占用更多的视觉空间（1-5格）
-- 中等音量：在中间区域波动（4-7格）
-- 大音量：才接近满格（8-10格）
+打造一个**经典复古且动感十足**的频谱分析仪效果：
+- **配色**：采用经典的 **绿 -> 黄 -> 红** 渐变色，模拟真实音响设备。
+- **背景**：深色半透明背景，未激活方块显示极暗的“底槽”，增加层次感。
+- **动态**：从低频到高频的波浪式律动，每列独立响应不同频率特性。
+- **细节**：顶部“峰值保持”效果（可选），方块间微小间距。
 
 ---
 
-## 2. 映射曲线设计
+## 1. 视觉设计
 
-### 输入范围
-```
-RMS 原始值: 0.0 ~ 0.8（通常不超过0.5）
-人声能量:   0.0 ~ 0.8
-```
+### 配色方案 (Gradient)
+- **顶部 (Top 20%)**: 红色 (警示/高潮) - `RGB(255, 60, 60)`
+- **中部 (Mid 30%)**: 黄色 (过渡) - `RGB(255, 220, 0)`
+- **底部 (Bottom 50%)**: 绿色 (正常) - `RGB(60, 255, 100)`
+- **未激活 (Inactive)**: 极暗的半透明黑 - `RGBA(20, 20, 20, 0.3)`
 
-### 映射公式
-```swift
-// 第一步：对数映射，扩展小值
-// log(1 + x * 10) / log(11) 把 0-1 映射到 0-1，但小值被放大
-func logMap(_ x: CGFloat) -> CGFloat {
-    return log(1 + x * 10) / log(11)
-}
-
-// 第二步：gamma 压缩，进一步扩展小值
-// gamma < 1 时，小值被放大，大值被压缩
-func gammaCompress(_ x: CGFloat, gamma: CGFloat = 0.6) -> CGFloat {
-    return pow(x, gamma)
-}
-
-// 综合映射
-func mapToHeight(_ rms: CGFloat) -> CGFloat {
-    let logged = logMap(rms)
-    let compressed = gammaCompress(logged, gamma: 0.5)
-    // 映射到 10%-90% 区间
-    return 0.1 + compressed * 0.8
-}
-```
-
-### 映射效果表
-| RMS 原始值 | 对数映射 | gamma(0.5) | 格数(共10格) |
-|-----------|---------|------------|-------------|
-| 0.00 | 0.00 | 0.00 | 1 |
-| 0.02 | 0.08 | 0.28 | 3 |
-| 0.05 | 0.18 | 0.42 | 4 |
-| 0.10 | 0.30 | 0.55 | 5 |
-| 0.20 | 0.46 | 0.68 | 6 |
-| 0.30 | 0.58 | 0.76 | 7 |
-| 0.50 | 0.74 | 0.86 | 8 |
-| 0.80 | 0.89 | 0.94 | 9 |
-| 1.00 | 1.00 | 1.00 | 10 |
+### 布局
+- **列数**：5列 (代表不同频段：低、中低、中、中高、高)
+- **块数**：每列 12 格 (增加分辨率)
+- **间距**：列间距 4px，块间距 2px
 
 ---
 
-## 3. 跳动效果
+## 2. 动画逻辑
 
-### 随机抖动
-每帧给每列添加独立的随机偏移：
-```swift
-let jitter = CGFloat.random(in: -0.08...0.08)
-```
+为了解决“只有最后两列跳动”的问题，我们将采用**频率分段模拟**策略：
 
-### 相位波动
-让每列以不同相位缓慢波动：
-```swift
-let phase = sin(time * 3 + columnIndex * 0.8) * 0.05
-```
+### 频段分配
+1. **Col 1 (Low)**: 主要响应 **Beat (鼓点)** 和 **低频能量**。
+2. **Col 2 (Low-Mid)**: 响应 **RMS (整体)** 和部分 **低频**。
+3. **Col 3 (Mid)**: 响应 **人声 (Mid-High)** 和 **RMS**。
+4. **Col 4 (High-Mid)**: 响应 **人声** 和快速变化的噪音。
+5. **Col 5 (High)**: 响应 **RMS** 的高频抖动分量。
 
-### 节拍响应
-检测到节拍时短暂增加高度：
+### 核心公式
 ```swift
-let beatPulse = beat * 0.15  // 节拍时额外增加15%
+// 基础能量
+let bass = smoothedBeat * 0.8 + smoothedLow * 0.4
+let mid = smoothedRMS * 1.2
+let treble = smoothedRMS * 0.6 + random(0.1) // 模拟高频噪点
+
+// 各列高度计算 (模拟频谱曲线)
+h[0] = bass
+h[1] = bass * 0.7 + mid * 0.3
+h[2] = mid * 1.1
+h[3] = mid * 0.6 + treble * 0.4
+h[4] = treble * 0.8
 ```
 
 ---
 
-## 4. 平滑参数
+## 3. 优化策略
 
-### Attack/Release
-```swift
-attackFactor = 0.35   // 快速响应
-releaseFactor = 0.12  // 慢速衰减，保持跳动惯性
-beatFactor = 0.5      // 节拍快速响应
-```
+### 律动优化
+- **Attack/Release**: 不同的频段使用不同的响应速度。
+  - 低频 (Col 1-2): Attack 快 (0.4), Release 慢 (0.15) -> 沉稳有力
+  - 中高频 (Col 3-5): Attack 极快 (0.6), Release 快 (0.3) -> 灵动跳跃
 
----
-
-## 5. 最终公式
-
-```swift
-// 1. 获取原始音频特征
-let rawRMS = audioService.currentFeatures.rms
-let rawLow = audioService.currentFeatures.lowEnergy
-let rawBeat = audioService.currentFeatures.beat
-
-// 2. 对数映射
-let logRMS = log(1 + rawRMS * 10) / log(11)
-let logLow = log(1 + rawLow * 10) / log(11)
-
-// 3. gamma 压缩 (gamma = 0.5)
-let compRMS = pow(logRMS, 0.5)
-let compLow = pow(logLow, 0.5)
-
-// 4. 平滑处理
-smoothedRMS = attack/release smooth of compRMS
-smoothedLow = attack/release smooth of compLow
-smoothedBeat = smooth of rawBeat
-
-// 5. 综合计算基础高度
-let baseLevel = max(smoothedRMS, smoothedLow * 0.8)
-
-// 6. 每列独立计算
-for i in 0..<columnCount {
-    let jitter = random(-0.08, 0.08)
-    let phase = sin(time * 3 + i * 0.8) * 0.05 * baseLevel
-    let beatPulse = smoothedBeat * 0.15
-    
-    // 映射到 10% - 95% 区间
-    let height = 0.10 + (baseLevel + jitter + phase + beatPulse) * 0.85
-    columnHeights[i] = clamp(height, 0.10, 0.95)
-}
-```
+### 视觉映射
+- 使用 `pow(x, 0.7)` 稍微提升低音量的可视高度，避免静音时完全黑屏。
+- 保持最低 1 格亮度 (1/12)，作为电源指示。
 
 ---
 
-## 6. 代码文件
+## 4. 代码实现计划
 
-| 文件 | 说明 |
-|------|------|
-| `UI/EqualizerView.swift` | 主视图实现 |
-| `Core/Config.swift` | 主题枚举定义 |
+### 文件：`UI/EqualizerView.swift`
+
+1. **废弃旧逻辑**：移除单一的 height 计算。
+2. **重构 `updateFeatures`**：计算 Bass, Mid, Treble 三个分量。
+3. **重构 `updateColumnHeights`**：基于分量计算 5 个独立高度。
+4. **重构 `body`**：
+   - 使用 `VStack` + `ForEach` 构建网格。
+   - 根据 `activeBlocks` 动态计算颜色（绿/黄/红）。
+
+### 代码片段预览
+```swift
+let color: Color
+if blockIndex >= 10 { color = .red }       // Top 2
+else if blockIndex >= 7 { color = .yellow } // Mid 3
+else { color = .green }                     // Bottom 7
+```
