@@ -10,7 +10,7 @@ struct EqualizerView: View {
     @State private var smoothedRMS: CGFloat = 0.0
     @State private var smoothedLowEnergy: CGFloat = 0.0
     @State private var smoothedBeat: CGFloat = 0.0
-    @State private var columnHeights: [CGFloat] = [0.15, 0.15, 0.15, 0.15, 0.15]
+    @State private var columnHeights: [CGFloat] = [0.1, 0.1, 0.1, 0.1, 0.1]
     @State private var timer: Timer?
     
     // 柱状图配置
@@ -29,18 +29,18 @@ struct EqualizerView: View {
                 HStack(alignment: .bottom, spacing: blockSpacing) {
                     ForEach(0..<columnCount, id: \.self) { columnIndex in
                         VStack(spacing: blockSpacing) {
-                            // 未激活的方块（灰色渐变：底部深，顶部浅）
+                            // 未激活的方块（灰色渐变：顶部最浅，底部最深）
                             let inactive = inactiveBlocks(for: columnIndex)
                             ForEach(0..<inactive, id: \.self) { blockIndex in
-                                let grayIntensity = CGFloat(inactive - blockIndex) / CGFloat(blockCount)
+                                let grayIntensity = CGFloat(blockIndex) / CGFloat(blockCount)
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color(white: 0.15 + grayIntensity * 0.15))
+                                    .fill(Color(white: 0.30 - grayIntensity * 0.12))
                                     .frame(width: columnWidth, height: blockHeight)
                             }
                             // 激活的方块（绿色渐变）
-                            ForEach(0..<activeBlocks(for: columnIndex), id: \.self) { blockIndex in
-                                let activeCount = activeBlocks(for: columnIndex)
-                                let intensity = CGFloat(activeCount - blockIndex) / CGFloat(blockCount)
+                            let active = activeBlocks(for: columnIndex)
+                            ForEach(0..<active, id: \.self) { blockIndex in
+                                let intensity = CGFloat(active - blockIndex) / CGFloat(blockCount)
                                 let isTop = blockIndex == 0
                                 
                                 RoundedRectangle(cornerRadius: 3)
@@ -99,9 +99,9 @@ struct EqualizerView: View {
         NSApp.windows.first { $0 is FloatingPanel }?.orderOut(nil)
     }
     
-    // 激活的方块数量
+    // 激活的方块数量（从下往上亮）
     private func activeBlocks(for column: Int) -> Int {
-        let height = columnHeights[safe: column] ?? 0.15
+        let height = columnHeights[safe: column] ?? 0.1
         return max(1, min(blockCount, Int(height * CGFloat(blockCount))))
     }
     
@@ -120,6 +120,18 @@ struct EqualizerView: View {
         return Color(hue: 0.35, saturation: saturation, brightness: brightness)
     }
     
+    // 对数映射：扩展小值，让小音量也有明显变化
+    private func logMap(_ x: CGFloat) -> CGFloat {
+        guard x > 0 else { return 0 }
+        return log(1 + x * 10) / log(11)
+    }
+    
+    // Gamma 压缩：进一步扩展小值
+    private func gammaCompress(_ x: CGFloat, gamma: CGFloat) -> CGFloat {
+        guard x > 0 else { return 0 }
+        return pow(x, gamma)
+    }
+    
     // 启动动画
     private func startAnimation() {
         timer?.invalidate()
@@ -133,43 +145,74 @@ struct EqualizerView: View {
     
     // 更新音频特征
     private func updateFeatures() {
-        let targetRMS: CGFloat
-        let targetLow: CGFloat
-        let targetBeat: CGFloat
+        let rawRMS: CGFloat
+        let rawLow: CGFloat
+        let rawBeat: CGFloat
         
         if audioService.isCapturing {
-            targetRMS = CGFloat(audioService.currentFeatures.rms)
-            targetLow = CGFloat(audioService.currentFeatures.lowEnergy)
-            targetBeat = CGFloat(audioService.currentFeatures.beat)
+            rawRMS = CGFloat(audioService.currentFeatures.rms)
+            rawLow = CGFloat(audioService.currentFeatures.lowEnergy)
+            rawBeat = CGFloat(audioService.currentFeatures.beat)
         } else {
-            targetRMS = 0.02
-            targetLow = 0.0
-            targetBeat = 0.0
+            rawRMS = 0.0
+            rawLow = 0.0
+            rawBeat = 0.0
         }
         
-        let smoothFactor: CGFloat = 0.25
-        let beatFactor: CGFloat = 0.5
-        smoothedRMS += (targetRMS - smoothedRMS) * smoothFactor
-        smoothedLowEnergy += (targetLow - smoothedLowEnergy) * smoothFactor
-        smoothedBeat += (targetBeat - smoothedBeat) * beatFactor
+        // 对数映射 + gamma 压缩
+        let mappedRMS = gammaCompress(logMap(rawRMS), gamma: 0.5)
+        let mappedLow = gammaCompress(logMap(rawLow), gamma: 0.5)
         
+        // Attack/Release 平滑
+        let attackFactor: CGFloat = 0.35
+        let releaseFactor: CGFloat = 0.12
+        let beatFactor: CGFloat = 0.5
+        
+        // RMS 平滑 (attack/release)
+        if mappedRMS > smoothedRMS {
+            smoothedRMS += (mappedRMS - smoothedRMS) * attackFactor
+        } else {
+            smoothedRMS += (mappedRMS - smoothedRMS) * releaseFactor
+        }
+        
+        // 人声能量平滑
+        if mappedLow > smoothedLowEnergy {
+            smoothedLowEnergy += (mappedLow - smoothedLowEnergy) * attackFactor
+        } else {
+            smoothedLowEnergy += (mappedLow - smoothedLowEnergy) * releaseFactor
+        }
+        
+        // 节拍平滑
+        smoothedBeat += (rawBeat - smoothedBeat) * beatFactor
+        
+        // 更新各列高度
         updateColumnHeights()
     }
     
     // 更新各列高度
     private func updateColumnHeights() {
-        let baseLevel = smoothedRMS * 1.5 + smoothedLowEnergy * 0.8
-        let beatBoost = smoothedBeat * 0.4
+        // 基础高度：取 RMS 和人声的较大者
+        let baseLevel = max(smoothedRMS, smoothedLowEnergy * 0.8)
         
-        let frequencyWeights: [CGFloat] = [0.9, 0.7, 0.5, 0.6, 0.8]
-        let phaseOffsets: [CGFloat] = [0, 0.2, 0.4, 0.3, 0.1]
+        // 当前时间（用于相位波动）
+        let time = CFAbsoluteTimeGetCurrent()
         
         for i in 0..<columnCount {
-            let noise = CGFloat.random(in: -0.08...0.08)
-            let freqContribution = smoothedLowEnergy * frequencyWeights[i]
-            let phase = sin(CFAbsoluteTimeGetCurrent() * 3 + Double(phaseOffsets[i]) * .pi) * 0.08
-            let height = baseLevel + freqContribution + beatBoost + noise + phase
-            columnHeights[i] = max(0.08, min(0.95, height))
+            // 每列独立的随机抖动
+            let jitter = CGFloat.random(in: -0.08...0.08)
+            
+            // 相位波动（让每列错开跳动）
+            let phaseOffset = Double(i) * 0.8
+            let wave = sin(time * 3 + phaseOffset) * 0.05 * (baseLevel + 0.2)
+            
+            // 节拍脉冲
+            let beatPulse = smoothedBeat * 0.15
+            
+            // 综合计算高度，映射到 10% - 95% 区间
+            let height = 0.10 + (baseLevel + jitter + wave + beatPulse) * 0.85
+            
+            // 限制范围
+            columnHeights[i] = max(0.10, min(0.95, height))
         }
     }
 }
