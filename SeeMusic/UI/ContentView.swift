@@ -5,10 +5,6 @@ struct ContentView: View {
     @ObservedObject var config = Config.shared
     @ObservedObject var audioService = AudioCaptureService.shared
     
-    // 调整大小控制状态
-    @State private var showResizeHandle = false
-    @State private var hideTimer: Timer?
-    
     var body: some View {
         ZStack {
             // 根据主题选择不同的视图
@@ -23,37 +19,11 @@ struct ContentView: View {
                 // 粒子脉冲主题
                 ParticlePulseView()
             }
-            
-            // 调整大小的边框指示器
-            if showResizeHandle {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 4, dash: [10]))
-                    .foregroundColor(Color.white.opacity(0.3))
-                    .allowsHitTesting(false) // 允许穿透点击
-                    .transition(.opacity)
-            }
         }
         .frame(
             width: config.windowWidth,
             height: config.windowHeight
         )
-        .onHover { isHovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                if isHovering {
-                    // 鼠标进入：立即显示，取消隐藏计时器
-                    showResizeHandle = true
-                    hideTimer?.invalidate()
-                    hideTimer = nil
-                } else {
-                    // 鼠标移出：延迟 2秒 隐藏
-                    hideTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            showResizeHandle = false
-                        }
-                    }
-                }
-            }
-        }
         .onAppear {
             // 统一启动音频捕获
             startAudioCapture()
@@ -61,7 +31,6 @@ struct ContentView: View {
         .onDisappear {
             // 统一停止音频捕获
             stopAudioCapture()
-            hideTimer?.invalidate()
         }
         .onChange(of: config.theme) { oldValue, newValue in
             // 主题切换时通知窗口调整大小

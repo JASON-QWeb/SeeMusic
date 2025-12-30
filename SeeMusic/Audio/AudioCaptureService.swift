@@ -136,7 +136,7 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
     }
     
     // 处理音频 buffer
-    private var logCounter = 0
+    // private var logCounter = 0
     private func processAudioBuffer(_ buffer: CMSampleBuffer) {
         let rawFeatures = featureExtractor.extractFeatures(from: buffer)
         let params = FeaturePipeline.Parameters(
@@ -151,11 +151,11 @@ class AudioCaptureService: NSObject, ObservableObject, SCStreamDelegate {
         let processed = featurePipeline.process(rawFeatures, parameters: params)
         currentFeatures = processed
         
-        logCounter += 1
-        if logCounter >= 60 {
-            logCounter = 0
-            print("[SeeMusic] 🎵 音频: RMS=\(String(format: "%.4f", processed.rms)), Low=\(String(format: "%.4f", processed.lowEnergy))")
-        }
+        // logCounter += 1
+        // if logCounter >= 60 {
+        //     logCounter = 0
+        //     print("[SeeMusic] 🎵 音频: RMS=\(String(format: "%.4f", processed.rms)), Low=\(String(format: "%.4f", processed.lowEnergy))")
+        // }
     }
 }
 
