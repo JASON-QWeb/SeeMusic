@@ -86,8 +86,8 @@ class MenuBarController {
         
         // 3. 音响主题组
         let equalizerMenu = NSMenu()
-        // 绿色 (Equalizer)
-        addItem(to: equalizerMenu, title: "绿色", theme: .equalizer)
+        // 经典 (Equalizer)
+        addItem(to: equalizerMenu, title: "经典", theme: .equalizer)
         
         let equalizerItem = NSMenuItem(title: "音响", action: nil, keyEquivalent: "")
         equalizerItem.submenu = equalizerMenu

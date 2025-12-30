@@ -45,23 +45,13 @@ struct ParticlePulseView: View {
                             climax: smoothedClimax
                         )
                         
-                        let brightness = clamp(0.25 + smoothedRMS * 0.45 + bulge * 0.6, 0.0, 1.0)
-                        let saturation = clamp(0.55 + smoothedRMS * 0.20 + smoothedClimax * 0.10, 0.0, 1.0)
+                        let hue = clamp(0.64 + particle.radius * 0.08 + bulge * 0.08 + smoothedClimax * 0.04, 0.0, 1.0)
+                        let brightness = clamp(0.25 + smoothedRMS * 0.50 + bulge * 0.6, 0.0, 1.0)
+                        let saturation = clamp(0.72 + smoothedRMS * 0.18, 0.0, 1.0)
                         let particleColor = Color(
-                            hue: 0.35,
+                            hue: hue,
                             saturation: saturation,
                             brightness: brightness
-                        )
-                        
-                        // 外发光
-                        context.fill(
-                            Circle().path(in: CGRect(
-                                x: position.x - particleSize * 1.2,
-                                y: position.y - particleSize * 1.2,
-                                width: particleSize * 2.4,
-                                height: particleSize * 2.4
-                            )),
-                            with: .color(particleColor.opacity(opacity * 0.20))
                         )
                         
                         // 核心粒子
@@ -157,7 +147,8 @@ struct ParticlePulseView: View {
         let edgeDamp = pow(1.0 - particle.radius, 0.6)
         let envelope = range * edgeDamp
         
-        let freq = 2.8 + rms * 6.0 + beat * 8.0
+        let beatSoft = pow(beat, 1.2)
+        let freq = 2.8 + rms * 6.0 + beatSoft * 8.0
         let freqValue = Double(freq)
         let wave = sin(time * freqValue - Double(particle.radius) * 6.0 + Double(particle.phase))
         let harmonic = 0.4 * sin(time * (freqValue * 1.7) + Double(particle.radius) * 9.0 + Double(particle.phase) * 1.3)
@@ -166,9 +157,9 @@ struct ParticlePulseView: View {
         let ringPos = (time * Double(ringSpeed)).truncatingRemainder(dividingBy: 1.0)
         let ringWidth = 0.10 + rms * 0.08
         let ring = exp(-pow(Double((particle.radius - CGFloat(ringPos)) / ringWidth), 2.0))
-        let impact = beat * CGFloat(ring) * 0.14 * edgeDamp
+        let impact = beatSoft * CGFloat(ring) * 0.14 * edgeDamp
         
-        let amp = 0.03 + rms * 0.10 + beat * 0.05 + climax * 0.08
+        let amp = 0.03 + rms * 0.10 + beatSoft * 0.05 + climax * 0.08
         let z = (CGFloat(wave) + CGFloat(harmonic)) * amp * envelope + impact
         let bulge = clamp(z, -0.18, 0.18)
         
@@ -215,10 +206,12 @@ struct ParticlePulseView: View {
         }
         
         let smoothFactor: CGFloat = 0.20
-        let beatFactor: CGFloat = 0.35
+        let beatAttack: CGFloat = 0.28
+        let beatRelease: CGFloat = 0.12
         let climaxFactor: CGFloat = 0.25
         smoothedRMS += (targetRMS - smoothedRMS) * smoothFactor
-        smoothedBeat += (targetBeat - smoothedBeat) * beatFactor
+        let beatAlpha = targetBeat > smoothedBeat ? beatAttack : beatRelease
+        smoothedBeat += (targetBeat - smoothedBeat) * beatAlpha
         smoothedClimax += (targetClimax - smoothedClimax) * climaxFactor
     }
     

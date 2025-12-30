@@ -8,6 +8,7 @@
 - **范围**：音量越大，震动范围从中心扩展到边缘
 - **冲击**：节拍触发“冲击环”向外扩散
 - **边缘固定**：边缘振幅被抑制，强调膜面张力
+- **配色**：霓虹蓝紫，去除外发光/外框
 
 ---
 
@@ -54,7 +55,8 @@ let θ = t * golden
 
 ```swift
 let smoothFactor: CGFloat = 0.20   // RMS 平滑
-let beatFactor: CGFloat = 0.35     // Beat 平滑
+let beatAttack: CGFloat = 0.28     // Beat 起音（更柔和）
+let beatRelease: CGFloat = 0.12    // Beat 释音（消除突兀震颤）
 let climaxFactor: CGFloat = 0.25   // Climax 平滑
 ```
 
@@ -70,14 +72,19 @@ edgeDamp = pow(1 - r, 0.6)          // 边缘固定
 envelope = range * edgeDamp
 ```
 
+### Beat 软化（避免突然震颤）
+```swift
+beatSoft = pow(beat, 1.2)          // 压缩尖峰
+```
+
 ### 频率（音量越大跳动越快）
 ```swift
-freq = 2.8 + rms * 6.0 + beat * 8.0
+freq = 2.8 + rms * 6.0 + beatSoft * 8.0
 ```
 
 ### 震幅
 ```swift
-amp = 0.03 + rms * 0.10 + beat * 0.05 + climax * 0.08
+amp = 0.03 + rms * 0.10 + beatSoft * 0.05 + climax * 0.08
 ```
 
 ### 鼓面波形（主模态 + 次模态）
@@ -91,7 +98,7 @@ harmonic = 0.4 * sin(t * freq * 1.7 + r * 9 + phase * 1.3)
 ringPos = (t * ringSpeed) % 1
 ringSpeed = 0.9 + rms * 0.6
 ringWidth = 0.10 + rms * 0.08
-impact = beat * exp(-((r - ringPos) / ringWidth)^2) * 0.14 * edgeDamp
+impact = beatSoft * exp(-((r - ringPos) / ringWidth)^2) * 0.14 * edgeDamp
 ```
 
 ### 最终位移（鼓面鼓起/下陷）
@@ -120,13 +127,13 @@ opacity = clamp(0.25 + rms * 0.35 + bulge * 0.9, 0.12, 1.0)
 
 ---
 
-## 8. 颜色
+## 8. 颜色（霓虹蓝紫）
 
 ```swift
 Color(
-    hue: 0.35,                                  // 绿色
-    saturation: 0.55 + rms * 0.20,
-    brightness: 0.25 + rms * 0.45 + bulge * 0.6
+    hue: 0.64 + r * 0.08 + bulge * 0.08,        // 蓝紫渐变
+    saturation: 0.72 + rms * 0.18,
+    brightness: 0.25 + rms * 0.50 + bulge * 0.6
 )
 ```
 
@@ -134,8 +141,7 @@ Color(
 
 ## 9. 渲染层次
 
-1. **外发光**：`opacity * 0.20`，尺寸 `× 2.2`
-2. **核心粒子**：`opacity`，原始尺寸
+1. **核心粒子**：`opacity`，原始尺寸（无外发光/外框）
 
 ---
 
@@ -144,9 +150,9 @@ Color(
 ```css
 :root {
   --drum-size: 200px;
-  --drum-core: hsl(126 58% 54%);
-  --drum-glow: hsl(126 80% 65% / 0.22);
-  --drum-bg: radial-gradient(circle at center, #0f1f15 0%, #090f0b 55%, #020202 100%);
+  --drum-core: hsl(226 90% 62%);
+  --drum-core-2: hsl(270 85% 66%);
+  --drum-bg: radial-gradient(circle at center, #10142c 0%, #080a16 55%, #030305 100%);
 }
 
 .drumhead-stage {
@@ -163,8 +169,7 @@ Color(
 .drumhead-particle {
   position: absolute;
   border-radius: 50%;
-  background: var(--drum-core);
-  box-shadow: 0 0 10px 2px var(--drum-glow);
+  background: linear-gradient(135deg, var(--drum-core), var(--drum-core-2));
   mix-blend-mode: screen;
 }
 ```
