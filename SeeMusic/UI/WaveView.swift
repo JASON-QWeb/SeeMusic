@@ -200,20 +200,7 @@ struct WaveView: View {
                 }
             }
             
-            // 绘制发光效果（底层）
-            context.stroke(
-                path,
-                with: .color(waveConfig.color.opacity(waveConfig.opacity * 0.2)),
-                style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)
-            )
-            
-            // 绘制中层光晕
-            context.stroke(
-                path,
-                with: .color(waveConfig.color.opacity(waveConfig.opacity * 0.4)),
-                style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
-            )
-            
+
             // 绘制主波浪
             context.stroke(
                 path,
